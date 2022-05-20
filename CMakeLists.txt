@@ -24,4 +24,10 @@ add_library(${PROJECT_NAME}_LIB ${SRC} ${HEAD})
 target_compile_definitions(${PROJECT_NAME}_LIB PRIVATE -D SA_LIB)
 target_precompile_headers(${PROJECT_NAME}_LIB PUBLIC "src/sa/pch.h")
 
+set_target_properties(
+		${PROJECT_NAME}_LIB
+		PROPERTIES
+		OUTPUT_NAME ${PROJECT_NAME}
+)
+
 add_subdirectory("test")
