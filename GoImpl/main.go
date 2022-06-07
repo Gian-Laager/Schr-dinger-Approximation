@@ -48,7 +48,7 @@ func integrate(f func(float64) complex128, a float64, b float64, n int64) comple
 
 func constructWaveFunc(mass float64, energy float64, c0 float64, theta float64, potential func(float64) float64) func(float64) complex128 {
 	phase := func(x float64) complex128 {
-		return cmplx.Sqrt(complex(potential(x)-energy, 0)) // / complex(hBar, 0)
+		return cmplx.Sqrt(complex(2.0, 0) * complex(mass, 0) * complex(potential(x)-energy, 0)) // / complex(hBar, 0)
 	}
 
 	cPlus := complex(0.5*c0*math.Cos(theta-math.Pi/4.0), 0)
@@ -57,7 +57,7 @@ func constructWaveFunc(mass float64, energy float64, c0 float64, theta float64, 
 	return func(x float64) complex128 {
 		integral := integrate(phase, x0, x, integrateSteps)
 
-		return (cPlus*cmplx.Exp(integral) + cMinus*cmplx.Exp(-integral)) / cmplx.Sqrt(integral)
+		return (cPlus*cmplx.Exp(integral) + cMinus*cmplx.Exp(-integral)) / cmplx.Sqrt(phase(x))
 	}
 }
 
@@ -88,10 +88,10 @@ func squarePot(x float64) float64 {
 }
 
 func main() {
-	mass := 0.5
-	energy := 1e3
-	c0 := 1.0
-	theta := math.Pi / 5
+	mass := 3.0
+	energy := 40.0
+	c0 := 1.2
+	theta := 0.0
 
 	waveFunc := constructWaveFunc(mass, energy, c0, theta, squarePot)
 
@@ -99,7 +99,7 @@ func main() {
 
 	psiChan := make(chan Pair[float64, complex128])
 
-	const view = 0.9
+	const view = 5.0
 
 	for i := int64(0); i < numPoints; i += numPoints / maxGoRoutinesPerWaveFunc {
 		go func(start int64, end int64) {
@@ -119,7 +119,7 @@ func main() {
 		return psis[i].First < psis[j].First
 	})
 
-	psis = append(psis[:len(psis)/2-1000], psis[len(psis)/2+1000:]...)
+	//psis = append(psis[:len(psis)/2-100], psis[len(psis)/2+100:]...)
 
 	for _, psi := range psis {
 		x := psi.First
