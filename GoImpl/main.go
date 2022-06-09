@@ -19,12 +19,53 @@ const (
 	x0                       = 0.0
 )
 
-func integrate(f func(float64) complex128, a float64, b float64, n int64) complex128 {
+type Integrate struct {
+	aPrev   float64
+	bPrev   float64
+	valPrev complex128
+	n       int64
+
+	f func(float64) complex128
+}
+
+func swapLimitsOfInteg(a float64, b float64) (float64, float64) {
 	if a > b {
-		tmp := a
-		a = b
-		b = tmp
+		return b, a
+	} else {
+		return a, b
 	}
+}
+
+func (c *Integrate) integrateAndUpdate(a float64, b float64, valPerv complex128) complex128 {
+	c.aPrev = a
+	c.bPrev = b
+	c.valPrev = valPerv
+	return valPerv
+}
+
+func (c *Integrate) Eval(a float64, b float64) complex128 {
+	a, b = swapLimitsOfInteg(a, b)
+
+	if a == c.aPrev && b == c.bPrev {
+		return c.valPrev
+	}
+
+	if a < c.aPrev && b == c.bPrev {
+		return c.integrateAndUpdate(a, b, c.valPrev+integrate(c.f, a, c.aPrev, c.n))
+	}
+
+	if a == c.aPrev && b > c.bPrev {
+		return c.integrateAndUpdate(a, b, c.valPrev+integrate(c.f, c.bPrev, b, c.n))
+	}
+
+	if a < c.aPrev && b > c.bPrev {
+		return c.integrateAndUpdate(a, b, integrate(c.f, a, c.aPrev, c.n)+c.valPrev+integrate(c.f, c.bPrev, b, c.n))
+	}
+
+	return c.integrateAndUpdate(a, b, integrate(c.f, a, b, c.n))
+}
+
+func integrate(f func(float64) complex128, a float64, b float64, n int64) complex128 {
 	var result complex128 = 0.0
 	var results chan complex128 = make(chan complex128)
 	for i := int64(0); i < n; i += n / maxGoRoutinesPerIntegral {
@@ -46,7 +87,7 @@ func integrate(f func(float64) complex128, a float64, b float64, n int64) comple
 	return result
 }
 
-func constructWaveFunc(mass float64, energy float64, c0 float64, theta float64, potential func(float64) float64) func(float64) complex128 {
+func constructWaveFunc(mass float64, energy float64, c0 float64, theta float64, potential func(float64) float64) func(float64, *Integrate) complex128 {
 	phase := func(x float64) complex128 {
 		return cmplx.Sqrt(complex(2.0, 0) * complex(mass, 0) * complex(potential(x)-energy, 0)) // / complex(hBar, 0)
 	}
@@ -54,8 +95,9 @@ func constructWaveFunc(mass float64, energy float64, c0 float64, theta float64, 
 	cPlus := complex(0.5*c0*math.Cos(theta-math.Pi/4.0), 0)
 	cMinus := complex(-0.5*c0*math.Sin(theta-math.Pi/4.0), 0)
 
-	return func(x float64) complex128 {
-		integral := integrate(phase, x0, x, integrateSteps)
+	return func(x float64, integ *Integrate) complex128 {
+		integ.f = phase
+		integral := integ.Eval(x0, x)
 
 		return (cPlus*cmplx.Exp(integral) + cMinus*cmplx.Exp(-integral)) / cmplx.Sqrt(phase(x))
 	}
@@ -89,7 +131,7 @@ func squarePot(x float64) float64 {
 
 func main() {
 	mass := 3.0
-	energy := 40.0
+	energy := 20.0
 	c0 := 1.2
 	theta := 0.0
 
@@ -104,8 +146,10 @@ func main() {
 	for i := int64(0); i < numPoints; i += numPoints / maxGoRoutinesPerWaveFunc {
 		go func(start int64, end int64) {
 			for k := start; k < end; k++ {
+
+				integ := Integrate{aPrev: 0, bPrev: 0, valPrev: 0, n: integrateSteps}
 				x := float64(k)/float64(numPoints-1)*(view*2) - view
-				psiChan <- Pair[float64, complex128]{x, waveFunc(x)}
+				psiChan <- Pair[float64, complex128]{x, waveFunc(x, &integ)}
 			}
 		}(i, i+numPoints/maxGoRoutinesPerWaveFunc)
 	}
