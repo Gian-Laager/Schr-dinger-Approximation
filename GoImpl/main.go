@@ -14,9 +14,9 @@ const (
 	hBar                     = 1.0546e-34
 	integrateSteps           = 10000
 	maxGoRoutinesPerIntegral = 100
-	maxGoRoutinesPerWaveFunc = 1000
-	numPoints                = 100000
-	x0                       = 0.0
+	maxGoRoutinesPerWaveFunc = 100
+	numPoints                = 10000
+	x0                       = 6.0
 )
 
 type Integrate struct {
@@ -28,14 +28,6 @@ type Integrate struct {
 	f func(float64) complex128
 }
 
-func swapLimitsOfInteg(a float64, b float64) (float64, float64) {
-	if a > b {
-		return b, a
-	} else {
-		return a, b
-	}
-}
-
 func (c *Integrate) integrateAndUpdate(a float64, b float64, valPerv complex128) complex128 {
 	c.aPrev = a
 	c.bPrev = b
@@ -44,8 +36,6 @@ func (c *Integrate) integrateAndUpdate(a float64, b float64, valPerv complex128)
 }
 
 func (c *Integrate) Eval(a float64, b float64) complex128 {
-	a, b = swapLimitsOfInteg(a, b)
-
 	if a == c.aPrev && b == c.bPrev {
 		return c.valPrev
 	}
@@ -126,29 +116,34 @@ type Pair[T, U any] struct {
 }
 
 func squarePot(x float64) float64 {
-	return x * x
+	return x * x * x
+}
+
+func constPot(x float64) float64 {
+	return 0
 }
 
 func main() {
 	mass := 3.0
 	energy := 20.0
 	c0 := 1.2
-	theta := 0.0
+	theta := 1.0
+	potential := squarePot
 
-	waveFunc := constructWaveFunc(mass, energy, c0, theta, squarePot)
+	waveFunc := constructWaveFunc(mass, energy, c0, theta, potential)
 
 	file, _ := os.Create("data.txt")
 
 	psiChan := make(chan Pair[float64, complex128])
 
-	const view = 5.0
+	const view = 3
 
 	for i := int64(0); i < numPoints; i += numPoints / maxGoRoutinesPerWaveFunc {
 		go func(start int64, end int64) {
 			for k := start; k < end; k++ {
 
 				integ := Integrate{aPrev: 0, bPrev: 0, valPrev: 0, n: integrateSteps}
-				x := float64(k)/float64(numPoints-1)*(view*2) - view
+				x := float64(k)/float64(numPoints-1)*(view*2) + 1.2 - view
 				psiChan <- Pair[float64, complex128]{x, waveFunc(x, &integ)}
 			}
 		}(i, i+numPoints/maxGoRoutinesPerWaveFunc)
@@ -195,7 +190,7 @@ func main() {
 		line.WriteString(" ")
 		line.WriteString(strconv.FormatFloat(0.0, 'g', 17, 64))
 		line.WriteString(" ")
-		line.WriteString(strconv.FormatFloat(squarePot(x), 'g', 17, 64))
+		line.WriteString(strconv.FormatFloat(potential(x), 'g', 17, 64))
 		line.WriteString("\n")
 		_, err := file.WriteString(line.String())
 		if err != nil {
