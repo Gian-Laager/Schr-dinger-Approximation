@@ -22,14 +22,24 @@ const (
 	energy                   = 2 * math.Pi * hBar * (3 + 0.5)
 	mass                     = 3.0
 	c0                       = 1e-30
-	theta                    = 1
+	theta                    = 0
 	view                     = 5
 	offset                   = -3
 )
 
+func signum(n float64) float64 {
+	if n < 0 {
+		return -1
+	} else if n > 0 {
+		return 1
+	} else {
+		return 0
+	}
+}
+
 var (
-	t1        = -math.Sqrt(energy + hBar*hBar/mass - math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass)
-	t2        = -math.Sqrt(energy + hBar*hBar/mass + math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass)
+	t1        = signum(x0) * math.Sqrt(energy+hBar*hBar/mass-math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass)
+	t2        = signum(x0) * math.Sqrt(energy+hBar*hBar/mass+math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass)
 	cPlus     = complex(0.5*c0*math.Cos(theta-math.Pi/4.0), 0)
 	cMinus    = complex(-0.5*c0*math.Sin(theta-math.Pi/4.0), 0)
 	potential = squarePot
@@ -222,6 +232,9 @@ func main() {
 		}(i, i+numPoints/maxGoRoutinesPerWaveFunc)
 	}
 	psis := make([]Pair[float64, complex128], numPoints)
+
+	fullPsi := make([]Pair[float64, complex128], numPoints)
+
 	for i := 0; i < numPoints; i++ {
 		psis[i] = <-psiChan
 	}
@@ -243,6 +256,7 @@ func main() {
 			line.WriteString(" ")
 			line.WriteString(strconv.FormatFloat(imag(psiOfX), 'g', 17, 64))
 			line.WriteString("\n")
+			fullPsi = append(fullPsi, Pair[float64, complex128]{x, psiOfX})
 		}
 		_, err := file.WriteString(line.String())
 		if err != nil {
@@ -289,6 +303,31 @@ func main() {
 		line.WriteString(strconv.FormatFloat(real(y), 'g', 17, 64))
 		line.WriteString(" ")
 		line.WriteString(strconv.FormatFloat(imag(y), 'g', 17, 64))
+		line.WriteString("\n")
+		fullPsi = append(fullPsi, Pair[float64, complex128]{x, y})
+		_, err := file.WriteString(line.String())
+		if err != nil {
+			fmt.Errorf(err.Error())
+			return
+		}
+	}
+
+	sort.Slice(fullPsi, func(i, j int) bool {
+		return fullPsi[i].First < fullPsi[j].First
+	})
+
+	file.WriteString("\n\n")
+
+	for _, psi := range fullPsi {
+		x := psi.First
+		absSquared := cmplx.Abs(psi.Second) * cmplx.Abs(psi.Second)
+		line := strings.Builder{}
+
+		line.WriteString(strconv.FormatFloat(x, 'g', 17, 64))
+		line.WriteString(" ")
+		line.WriteString("0.0")
+		line.WriteString(" ")
+		line.WriteString(strconv.FormatFloat(absSquared, 'g', 17, 64))
 		line.WriteString("\n")
 		_, err := file.WriteString(line.String())
 		if err != nil {
