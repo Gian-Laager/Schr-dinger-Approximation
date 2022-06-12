@@ -23,6 +23,8 @@ const (
 	mass                     = 3.0
 	c0                       = 1e-30
 	theta                    = 1
+	view                     = 5
+	offset                   = -3
 )
 
 var (
@@ -209,14 +211,12 @@ func main() {
 
 	psiChan := make(chan Pair[float64, complex128])
 
-	const view = 5
-
 	for i := int64(0); i < numPoints; i += numPoints / maxGoRoutinesPerWaveFunc {
 		go func(start int64, end int64) {
 			for k := start; k < end; k++ {
 
 				integ := Integrate{aPrev: 0, bPrev: 0, valPrev: 0, n: integrateSteps}
-				x := float64(k)/float64(numPoints-1)*(view*2) - 3 - view
+				x := float64(k)/float64(numPoints-1)*(view*2) + offset - view
 				psiChan <- Pair[float64, complex128]{x, waveFunc(x, &integ)}
 			}
 		}(i, i+numPoints/maxGoRoutinesPerWaveFunc)
