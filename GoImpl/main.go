@@ -19,15 +19,15 @@ const (
 	numPoints                = 10000
 	x0                       = -10.0
 	deltaDerivative          = 1e-9
-	energy                   = 20.0
+	energy                   = 2 * math.Pi * hBar * (3 + 0.5)
 	mass                     = 3.0
-	c0                       = 1
-	theta                    = 0
+	c0                       = 1e-30
+	theta                    = 1
 )
 
 var (
-	t1        = -math.Sqrt(energy+hBar*hBar/mass-math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass) / 1.1
-	t2        = -math.Sqrt(energy+hBar*hBar/mass+math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass) * 1.1
+	t1        = -math.Sqrt(energy + hBar*hBar/mass - math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass)
+	t2        = -math.Sqrt(energy + hBar*hBar/mass + math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass)
 	cPlus     = complex(0.5*c0*math.Cos(theta-math.Pi/4.0), 0)
 	cMinus    = complex(-0.5*c0*math.Sin(theta-math.Pi/4.0), 0)
 	potential = squarePot
@@ -41,7 +41,7 @@ func g(x float64) complex128 {
 	return AiryBi(cmplx.Pow(complex(2*mass/(hBar*hBar)*(potential(t1)-potential(t2))/(t1-t2), 0), 1/3.0) * complex(x-(t1+t2)/2.0, 0))
 }
 
-func k(x float64) complex128 {
+func h(x float64) complex128 {
 	integrant := func(x float64) complex128 {
 		return cmplx.Sqrt(complex(2*mass*(potential(x)-energy), 0)) / hBar
 	}
@@ -49,7 +49,7 @@ func k(x float64) complex128 {
 	return cmplx.Exp(Integral(integrant, x0, x, 1000)) / cmplx.Sqrt(integrant(x))
 }
 
-func h(x float64) complex128 {
+func k(x float64) complex128 {
 	integrant := func(x float64) complex128 {
 		return -cmplx.Sqrt(complex(2*mass*(potential(x)-energy), 0)) / hBar
 	}
@@ -73,7 +73,7 @@ func ComputeCs() (complex128, complex128) {
 }
 
 func AiryBi(z complex128) complex128 {
-	return -complex(0, 1)*mathext.AiryAi(z) + 2*mathext.AiryAi(z*cmplx.Pow(complex(-1, 0), 2.0/3.0))*cmplx.Pow(complex(-1, 0), 1/6.0)
+	return -complex(0, 1)*mathext.AiryAi(z) + 2*mathext.AiryAi(z*complex(-0.5, math.Sqrt(3)/2))*complex(math.Sqrt(3)/2.0, 0.5)
 }
 
 type Integrate struct {
