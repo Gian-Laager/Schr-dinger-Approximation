@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	hBar                     = 1.5
+	hBar                     = 1
 	integrateSteps           = 10000
 	maxGoRoutinesPerIntegral = 100
 	maxGoRoutinesPerWaveFunc = 100
@@ -21,24 +21,24 @@ const (
 	deltaDerivative          = 1e-9
 	energy                   = 20.0
 	mass                     = 3.0
-	c0                       = 1.2
+	c0                       = 1
 	theta                    = 0
 )
 
 var (
-	t1        = -math.Sqrt(energy + hBar*hBar/mass - math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass)
-	t2        = -math.Sqrt(energy + hBar*hBar/mass + math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass)
+	t1        = -math.Sqrt(energy+hBar*hBar/mass-math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass) / 1.1
+	t2        = -math.Sqrt(energy+hBar*hBar/mass+math.Sqrt(hBar*hBar*(hBar*hBar+2*mass*energy))/mass) * 1.1
 	cPlus     = complex(0.5*c0*math.Cos(theta-math.Pi/4.0), 0)
 	cMinus    = complex(-0.5*c0*math.Sin(theta-math.Pi/4.0), 0)
 	potential = squarePot
 )
 
 func f(x float64) complex128 {
-	return mathext.AiryAi(cmplx.Pow(complex((potential(t1)-potential(t2))/(t1-t2), 0), 1/3.0) * complex(x*(t1+t2)/2.0, 0))
+	return mathext.AiryAi(cmplx.Pow(complex(2*mass/(hBar*hBar)*(potential(t1)-potential(t2))/(t1-t2), 0), 1/3.0) * complex(x-(t1+t2)/2.0, 0))
 }
 
 func g(x float64) complex128 {
-	return AiryBi(cmplx.Pow(complex((potential(t1)-potential(t2))/(t1-t2), 0), 1/3.0) * complex(x*(t1+t2)/2.0, 0))
+	return AiryBi(cmplx.Pow(complex(2*mass/(hBar*hBar)*(potential(t1)-potential(t2))/(t1-t2), 0), 1/3.0) * complex(x-(t1+t2)/2.0, 0))
 }
 
 func k(x float64) complex128 {
@@ -46,7 +46,7 @@ func k(x float64) complex128 {
 		return cmplx.Sqrt(complex(2*mass*(potential(x)-energy), 0)) / hBar
 	}
 
-	return cmplx.Exp(Integral(integrant, x0, x, 10000)) / cmplx.Sqrt(integrant(x))
+	return cmplx.Exp(Integral(integrant, x0, x, 1000)) / cmplx.Sqrt(integrant(x))
 }
 
 func h(x float64) complex128 {
@@ -54,7 +54,7 @@ func h(x float64) complex128 {
 		return -cmplx.Sqrt(complex(2*mass*(potential(x)-energy), 0)) / hBar
 	}
 
-	return cmplx.Exp(Integral(integrant, x0, x, 10000)) / cmplx.Sqrt(integrant(x))
+	return cmplx.Exp(Integral(integrant, x0, x, 1000)) / cmplx.Sqrt(integrant(x))
 }
 
 func ComputeCs() (complex128, complex128) {
@@ -135,9 +135,21 @@ func Integral(f func(float64) complex128, a float64, b float64, n int64) complex
 }
 
 func isWkbValid(x float64, potential func(float64) float64, energy float64, mass float64) bool {
-	derivative := hBar / math.Sqrt(2*mass) * math.Abs(((potential(x+deltaDerivative)-energy)-(potential(x)-energy))/deltaDerivative)
-	qSquared := (potential(x) - energy) * (potential(x) - energy)
-	return derivative < qSquared
+	//derivative := hBar / math.Sqrt(2*mass) * math.Abs(((potential(x+deltaDerivative)-energy)-(potential(x)-energy))/deltaDerivative)
+	//qSquared := (potential(x) - energy) * (potential(x) - energy)
+	//return derivative < qSquared
+	var low float64
+	var high float64
+
+	if t1 > t2 {
+		low = t2
+		high = t1
+	} else {
+		low = t1
+		high = t2
+	}
+
+	return x < low || x > high
 }
 
 func constructWaveFunc(mass float64, energy float64, c0 float64, theta float64, potential func(float64) float64) func(float64, *Integrate) complex128 {
@@ -145,8 +157,8 @@ func constructWaveFunc(mass float64, energy float64, c0 float64, theta float64, 
 		return cmplx.Sqrt(complex(2.0, 0)*complex(mass, 0)*complex(potential(x)-energy, 0)) / complex(hBar, 0)
 	}
 
-	cPlus := complex(0.5*c0*math.Cos(theta-math.Pi/4.0), 0)
-	cMinus := complex(-0.5*c0*math.Sin(theta-math.Pi/4.0), 0)
+	//cPlus := complex(0.5*c0*math.Cos(theta-math.Pi/4.0), 0)
+	//cMinus := complex(-0.5*c0*math.Sin(theta-math.Pi/4.0), 0)
 
 	return func(x float64, integ *Integrate) complex128 {
 		integ.f = phase
