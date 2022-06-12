@@ -17,14 +17,14 @@ const (
 	maxGoRoutinesPerIntegral = 100
 	maxGoRoutinesPerWaveFunc = 100
 	numPoints                = 10000
-	x0                       = -10.0
+	x0                       = 10.0
 	deltaDerivative          = 1e-9
 	energy                   = 2 * math.Pi * hBar * (3 + 0.5)
 	mass                     = 3.0
 	c0                       = 1e-30
 	theta                    = 0
 	view                     = 5
-	offset                   = -3
+	offset                   = 3
 )
 
 func signum(n float64) float64 {
@@ -63,10 +63,10 @@ func h(x float64) complex128 {
 
 func k(x float64) complex128 {
 	integrant := func(x float64) complex128 {
-		return -cmplx.Sqrt(complex(2*mass*(potential(x)-energy), 0)) / hBar
+		return cmplx.Sqrt(complex(2*mass*(potential(x)-energy), 0)) / hBar
 	}
 
-	return cmplx.Exp(Integral(integrant, x0, x, 1000)) / cmplx.Sqrt(integrant(x))
+	return cmplx.Exp(-Integral(integrant, x0, x, 1000)) / cmplx.Sqrt(integrant(x))
 }
 
 func ComputeCs() (complex128, complex128) {
@@ -211,6 +211,12 @@ func constPot(x float64) float64 {
 }
 
 func main() {
+	if t1 > t2 {
+		tmp := t1
+		t1 = t2
+		t2 = tmp
+	}
+
 	println("t1 = ", t1)
 	println("t2 = ", t2)
 	println("x1 = ", (t1+t2)/2.0)
@@ -252,9 +258,9 @@ func main() {
 		if !math.IsNaN(real(psiOfX)) && !math.IsNaN(imag(psiOfX)) && isWkbValid(x, potential, energy, mass) {
 			line.WriteString(strconv.FormatFloat(x, 'g', 17, 64))
 			line.WriteString(" ")
-			line.WriteString(strconv.FormatFloat(real(psiOfX), 'g', 17, 64))
-			line.WriteString(" ")
 			line.WriteString(strconv.FormatFloat(imag(psiOfX), 'g', 17, 64))
+			line.WriteString(" ")
+			line.WriteString(strconv.FormatFloat(real(psiOfX), 'g', 17, 64))
 			line.WriteString("\n")
 			fullPsi = append(fullPsi, Pair[float64, complex128]{x, psiOfX})
 		}
@@ -300,9 +306,9 @@ func main() {
 
 		line.WriteString(strconv.FormatFloat(x, 'g', 17, 64))
 		line.WriteString(" ")
-		line.WriteString(strconv.FormatFloat(real(y), 'g', 17, 64))
-		line.WriteString(" ")
 		line.WriteString(strconv.FormatFloat(imag(y), 'g', 17, 64))
+		line.WriteString(" ")
+		line.WriteString(strconv.FormatFloat(real(y), 'g', 17, 64))
 		line.WriteString("\n")
 		fullPsi = append(fullPsi, Pair[float64, complex128]{x, y})
 		_, err := file.WriteString(line.String())
