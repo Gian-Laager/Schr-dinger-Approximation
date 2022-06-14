@@ -1,22 +1,15 @@
-use std::cmp::min;
-use std::f32::consts::PI;
 use std::future::Future;
-use std::ops::Deref;
-use std::os::unix::process::parent_id;
-use std::process::Output;
-use num::CheckedMul;
-use num::complex::{Complex, Complex64};
+use num::complex::{Complex64};
 use tokio;
-use tokio::runtime;
-use tokio::runtime::Runtime;
+use rayon::iter::*;
 
-const MAX_PARTIAL_SUM_PER_THREAD: usize = 32;
-const INTEG_STEPS: usize = 1000;
+const TRAPEZE_PER_THREAD: usize = 100;
+const INTEG_STEPS: usize = 10000;
 const H_BAR: f64 = 1.0;
 const X_0: f64 = 0.0;
 
 trait ReToC: Sync {
-    fn eval(&self, args: f64) -> Complex64;
+    fn eval(&self, x: &f64) -> Complex64;
 }
 
 struct Function {
@@ -30,25 +23,25 @@ impl Function {
 }
 
 impl ReToC for Function {
-    fn eval(&self, x: f64) -> Complex64 {
-        (self.f)(x)
+    fn eval(&self, x: &f64) -> Complex64 {
+        (self.f)(*x)
     }
 }
 
 struct Phase {
     energy: f64,
     mass: f64,
-    potential: fn(f64) -> f64,
+    potential: fn(&f64) -> f64,
 }
 
 impl Phase {
-    fn new(energy: f64, mass: f64, potential: fn(f64) -> f64) -> Phase {
+    fn new(energy: f64, mass: f64, potential: fn(&f64) -> f64) -> Phase {
         return Phase { energy, mass, potential };
     }
 }
 
 impl ReToC for Phase {
-    fn eval(&self, x: f64) -> Complex64 {
+    fn eval(&self, x: &f64) -> Complex64 {
         return (complex(2.0, 0.0) * complex(self.mass, 0.0) * complex((self.potential)(x) - self.energy, 0.0)).sqrt() / complex(H_BAR, 0.0);
     }
 }
@@ -58,43 +51,55 @@ fn complex(re: f64, im: f64) -> Complex64 {
     return Complex64 { re, im };
 }
 
-fn trapezoidal_approx(f: &dyn ReToC, i: usize, a: f64, b: f64, n: usize) -> Complex64 {
-    let a_ = a + i as f64 * (b - a) / n as f64;
-    let b_ = a + (i as f64 + 1.0) * (b - a) / n as f64;
-
-    return complex(b_ - a_, 0.0) * (f.eval(a_) + f.eval(b_)) / complex(2.0, 0.0);
+fn trapezoidal_approx(start: &Point, end: &Point) -> Complex64 {
+    return complex(end.x - start.x, 0.0) * (start.y + end.y) / complex(2.0, 0.0);
 }
 
-async fn integrate(f: &'static dyn ReToC, a: f64, b: f64, n: usize) -> Complex64 {
-    let mut sum = complex(0.0, 0.0);
 
-    return if n < MAX_PARTIAL_SUM_PER_THREAD {
-        for i in 0..n {
-            sum += trapezoidal_approx(f, i, a, b, n);
-        }
-        sum
-    } else {
-        let mut futures = vec![];
-        for i in (0..n).step_by(MAX_PARTIAL_SUM_PER_THREAD) {
-            futures.push(tokio::spawn(async move {
-                let mut partial_sum = complex(0.0, 0.0);
+fn index_to_range(x: f64, in_min: f64, in_max: f64, out_min: f64, out_max: f64) -> f64 {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
 
-                let end = min(n, i + MAX_PARTIAL_SUM_PER_THREAD);
+struct Point {
+    x: f64,
+    y: Complex64,
+}
 
-                for j in i..end {
-                    partial_sum += trapezoidal_approx(f, j, a, b, n);
-                }
-                return partial_sum;
-            }));
-        }
+fn integrate(points: Vec<Point>, batch_size: usize) -> Complex64 {
+    if points.len() < 2 {
+        return complex(0.0, 0.0);
+    }
 
-        for f in futures {
-            sum += f.await.unwrap();
-        }
+    let batches: Vec<&[Point]> = points.chunks(batch_size).collect();
 
-        // rest due to rounding errors
-        sum
-    };
+    let parallel: Complex64 = batches.par_iter()
+        .map(|batch| {
+            let mut sum = complex(0.0, 0.0);
+            for i in 0..(batch.len() - 1) {
+                sum += trapezoidal_approx(&batch[i], &batch[i + 1]);
+            }
+            return sum;
+        })
+        .sum();
+
+    let mut rest = complex(0.0, 0.0);
+
+    for i in 0..batches.len() - 1 {
+        rest += trapezoidal_approx(&batches[i][batches[i].len() - 1], &batches[i + 1][0]);
+    }
+
+    return parallel + rest;
+}
+
+fn make_integrate_inputs(f: &dyn ReToC, a: f64, b: f64, n: usize) -> Vec<Point> {
+    if a == b {
+        return vec![];
+    }
+
+    (0..n).into_par_iter()
+        .map(|i| index_to_range(i as f64, 0.0, n as f64 - 1.0, a, b))
+        .map(|x| Point { x, y: f.eval(&x) })
+        .collect()
 }
 
 struct WaveFunction {
@@ -113,9 +118,9 @@ impl WaveFunction {
 
     fn eval(&self, x: f64) -> Box<dyn Future<Output=Complex64> + '_> {
         Box::new(async move {
-            let integral = integrate(self.phase, X_0, x, self.integration_steps).await;
+            let integral = integrate(make_integrate_inputs(self.phase, X_0, x, self.integration_steps), TRAPEZE_PER_THREAD);
 
-            return (self.c_plus * integral.exp() + self.c_minus * (-integral).exp()) / (self.phase.eval(x)).sqrt();
+            return (self.c_plus * integral.exp() + self.c_minus * (-integral).exp()) / (self.phase.eval(&x)).sqrt();
         })
     }
 }
@@ -127,10 +132,6 @@ async fn main() {
 
 #[cfg(test)]
 mod test {
-    use std::future::Future;
-    use num::abs;
-    use tokio::runtime;
-    use tokio::task::JoinHandle;
     use super::*;
 
     fn square(x: f64) -> Complex64 {
@@ -148,19 +149,40 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_square() {
-        static square_func: Function = Function::new(square);
+        static SQUARE_FUNC: Function = Function::new(square);
         for i in 0..1000 {
             for j in 0..1000 {
                 let a = f64::from(i - 50) / 123.0;
                 let b = f64::from(j - 50) / 123.0;
 
                 if i == j {
-                    assert_eq!(integrate(&square_func, a, b, INTEG_STEPS).await, complex(0.0, 0.0));
+                    assert_eq!(integrate(make_integrate_inputs(&SQUARE_FUNC, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), complex(0.0, 0.0));
                     continue;
                 }
+
                 let epsilon = 0.00001;
-                assert!(float_compare(integrate(&square_func, a, b, INTEG_STEPS).await, square_itegral(a, b), epsilon));
+                if !float_compare(integrate(make_integrate_inputs(&SQUARE_FUNC, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), square_itegral(a, b), epsilon) {
+                    println!("a: {}, b: {}, expected: {}, actual: {}", a, b, square_itegral(a, b), integrate(make_integrate_inputs(&SQUARE_FUNC, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD))
+                }
+                assert!(float_compare(integrate(make_integrate_inputs(&SQUARE_FUNC, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), square_itegral(a, b), epsilon));
             }
+        }
+    }
+
+
+    #[test]
+    fn make_integrate_inputs_square() {
+        static SQUARE_FUNC: Function = Function::new(square);
+        let actual = make_integrate_inputs(&SQUARE_FUNC, -2.0, 2.0, 5);
+        let expected = vec![Point { x: -2.0, y: complex(4.0, 0.0) },
+                            Point { x: -1.0, y: complex(1.0, 0.0) },
+                            Point { x: 0.0, y: complex(0.0, 0.0) },
+                            Point { x: 1.0, y: complex(1.0, 0.0) },
+                            Point { x: 2.0, y: complex(4.0, 0.0) }];
+
+        for (a, e) in actual.iter().zip(expected) {
+            assert_eq!(a.x, e.x);
+            assert_eq!(a.y, e.y);
         }
     }
 
@@ -173,6 +195,7 @@ mod test {
         return complex(-0.5, 0.5) * (complex(a, a).exp() - complex(b, b).exp());
     }
 
+
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_sinusoidal_exp() {
         static SINUSOIDAL_EXP_COMPLEX: Function = Function::new(sinusoidal_exp_complex);
@@ -182,11 +205,14 @@ mod test {
                 let b = f64::from(j - 50) / 123.0;
 
                 if i == j {
-                    assert_eq!(integrate(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS).await, complex(0.0, 0.0));
+                    assert_eq!(integrate(make_integrate_inputs(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), complex(0.0, 0.0));
                     continue;
                 }
                 let epsilon = 0.0001;
-                assert!(float_compare(integrate(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS).await, sinusoidal_exp_complex_integral(a, b), epsilon));
+                if !float_compare(integrate(make_integrate_inputs(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), sinusoidal_exp_complex_integral(a, b), epsilon) {
+                    println!("a: {}, b: {}, expected: {}, actual: {}", a, b, sinusoidal_exp_complex_integral(a, b), integrate(make_integrate_inputs(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD))
+                }
+                assert!(float_compare(integrate(make_integrate_inputs(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), sinusoidal_exp_complex_integral(a, b), epsilon));
             }
         }
     }
