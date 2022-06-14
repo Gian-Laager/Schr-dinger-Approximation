@@ -138,3 +138,5 @@ _deps
 *.app
 
 GoImpl/bench
+
+Schroedinger/target/
