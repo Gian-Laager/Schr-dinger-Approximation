@@ -4,7 +4,7 @@ use tokio;
 use rayon::iter::*;
 
 const TRAPEZE_PER_THREAD: usize = 100;
-const INTEG_STEPS: usize = 10000;
+const INTEG_STEPS: usize = 1000;
 const H_BAR: f64 = 1.0;
 const X_0: f64 = 0.0;
 
@@ -150,10 +150,10 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_square() {
         static SQUARE_FUNC: Function = Function::new(square);
-        for i in 0..1000 {
-            for j in 0..1000 {
-                let a = f64::from(i - 50) / 123.0;
-                let b = f64::from(j - 50) / 123.0;
+        for i in 0..100 {
+            for j in 0..100 {
+                let a = f64::from(i - 50) / 12.3;
+                let b = f64::from(j - 50) / 12.3;
 
                 if i == j {
                     assert_eq!(integrate(make_integrate_inputs(&SQUARE_FUNC, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), complex(0.0, 0.0));
@@ -161,9 +161,6 @@ mod test {
                 }
 
                 let epsilon = 0.00001;
-                if !float_compare(integrate(make_integrate_inputs(&SQUARE_FUNC, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), square_itegral(a, b), epsilon) {
-                    println!("a: {}, b: {}, expected: {}, actual: {}", a, b, square_itegral(a, b), integrate(make_integrate_inputs(&SQUARE_FUNC, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD))
-                }
                 assert!(float_compare(integrate(make_integrate_inputs(&SQUARE_FUNC, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), square_itegral(a, b), epsilon));
             }
         }
@@ -199,19 +196,16 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_sinusoidal_exp() {
         static SINUSOIDAL_EXP_COMPLEX: Function = Function::new(sinusoidal_exp_complex);
-        for i in 0..1000 {
-            for j in 0..1000 {
-                let a = f64::from(i - 50) / 123.0;
-                let b = f64::from(j - 50) / 123.0;
+        for i in 0..100 {
+            for j in 0..100 {
+                let a = f64::from(i - 50) / 12.3;
+                let b = f64::from(j - 50) / 12.3;
 
                 if i == j {
                     assert_eq!(integrate(make_integrate_inputs(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), complex(0.0, 0.0));
                     continue;
                 }
                 let epsilon = 0.0001;
-                if !float_compare(integrate(make_integrate_inputs(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), sinusoidal_exp_complex_integral(a, b), epsilon) {
-                    println!("a: {}, b: {}, expected: {}, actual: {}", a, b, sinusoidal_exp_complex_integral(a, b), integrate(make_integrate_inputs(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD))
-                }
                 assert!(float_compare(integrate(make_integrate_inputs(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), sinusoidal_exp_complex_integral(a, b), epsilon));
             }
         }
