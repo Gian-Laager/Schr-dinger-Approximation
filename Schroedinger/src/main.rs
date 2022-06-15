@@ -1,12 +1,23 @@
+use std::fs;
+use std::fs::File;
 use std::future::Future;
+use std::io::Write;
 use num::complex::{Complex64};
 use tokio;
 use rayon::iter::*;
 
-const TRAPEZE_PER_THREAD: usize = 100;
-const INTEG_STEPS: usize = 1000;
+const TRAPEZE_PER_THREAD: usize = 1000;
+const INTEG_STEPS: usize = 10000;
+const NUMBER_OF_POINTS: usize = 10000;
 const H_BAR: f64 = 1.0;
-const X_0: f64 = 0.0;
+const X_0: f64 = -10.0;
+const ENERGY: f64 = 20.0;
+const MASS: f64 = 3.0;
+const C_0: f64 = 1.0;
+const THETA: f64 = 1.0;
+
+const VIEW: (f64, f64) = (-10.0, 0.0);
+
 
 trait ReToC: Sync {
     fn eval(&self, x: &f64) -> Complex64;
@@ -35,7 +46,7 @@ struct Phase {
 }
 
 impl Phase {
-    fn new(energy: f64, mass: f64, potential: fn(&f64) -> f64) -> Phase {
+    const fn new(energy: f64, mass: f64, potential: fn(&f64) -> f64) -> Phase {
         return Phase { energy, mass, potential };
     }
 }
@@ -110,24 +121,37 @@ struct WaveFunction {
 }
 
 impl WaveFunction {
-    fn new(phase: &'static Phase, c0: f64, theta: f64, integration_steps: usize) {
+    fn new(phase: &'static Phase, c0: f64, theta: f64, integration_steps: usize) -> WaveFunction {
         let c_plus = complex(0.5 * c0 * f64::cos(theta - std::f64::consts::PI / 4.0), 0.0);
         let c_minus = complex(-0.5 * c0 * f64::cos(theta - std::f64::consts::PI / 4.0), 0.0);
-        WaveFunction { c_plus, c_minus, phase, integration_steps };
+        return WaveFunction { c_plus, c_minus, phase, integration_steps };
     }
+}
 
-    fn eval(&self, x: f64) -> Box<dyn Future<Output=Complex64> + '_> {
-        Box::new(async move {
-            let integral = integrate(make_integrate_inputs(self.phase, X_0, x, self.integration_steps), TRAPEZE_PER_THREAD);
+impl ReToC for WaveFunction {
+    fn eval(&self, x: &f64) -> Complex64 {
+        let integral = integrate(make_integrate_inputs(self.phase, X_0, *x, self.integration_steps), TRAPEZE_PER_THREAD);
 
-            return (self.c_plus * integral.exp() + self.c_minus * (-integral).exp()) / (self.phase.eval(&x)).sqrt();
-        })
+        return (self.c_plus * integral.exp() + self.c_minus * (-integral).exp()) / (self.phase.eval(&x)).sqrt();
     }
+}
+
+fn square(x: &f64) -> f64 {
+    return x * x;
 }
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    println!("Hello, world!");
+    static PHASE: Phase = Phase::new(ENERGY, MASS, square);
+    let wave_func = WaveFunction::new(&PHASE, C_0, THETA, INTEG_STEPS);
+    let values = make_integrate_inputs(&wave_func, VIEW.0, VIEW.1, NUMBER_OF_POINTS);
+    let mut data_file = File::create("data.txt").unwrap();
+    let data_str: String = values.par_iter().map(|p| -> String {
+        format!("{} {} {}\n", p.x, p.y.re, p.y.im)
+    }).reduce(|| String::new(), |s: String, current: String| {
+        s + &*current
+    });
+    data_file.write_all(data_str.as_ref()).unwrap()
 }
 
 #[cfg(test)]
