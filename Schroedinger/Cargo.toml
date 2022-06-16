@@ -1,5 +1,5 @@
 [package]
-name = "Schroedinger"
+name = "shroedinger_approx"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,3 +9,4 @@ edition = "2021"
 num = "0.4.0"
 tokio = { version = "1.0.3", features = ["full"] }
 rayon = "1.5.3"
+GSL = "6.0.0"

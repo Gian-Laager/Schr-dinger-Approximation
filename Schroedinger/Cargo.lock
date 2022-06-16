@@ -3,12 +3,23 @@
 version = 3
 
 [[package]]
-name = "Schroedinger"
-version = "0.1.0"
+name = "GSL"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9becaf6d7d1ba36a457288e661fa6a0472e8328629276f45369eafcd48ef1ce"
 dependencies = [
- "num",
- "rayon",
- "tokio",
+ "GSL-sys",
+ "paste",
+]
+
+[[package]]
+name = "GSL-sys"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4577670dcc0720995dc39f04c438595eaae8ccc27f4aafd3e572dd408d01bd9d"
+dependencies = [
+ "libc",
+ "pkg-config",
 ]
 
 [[package]]
@@ -269,10 +280,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c520e05135d6e763148b6426a837e239041653ba7becd2e538c076c738025fc"
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0a7ae3ac2f1173085d398531c705756c94a4c56843785df85a60c1a0afac116"
+
+[[package]]
+name = "pkg-config"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
 
 [[package]]
 name = "proc-macro2"
@@ -330,6 +353,16 @@ name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
+
+[[package]]
+name = "shroedinger_approx"
+version = "0.1.0"
+dependencies = [
+ "GSL",
+ "num",
+ "rayon",
+ "tokio",
+]
 
 [[package]]
 name = "signal-hook-registry"
