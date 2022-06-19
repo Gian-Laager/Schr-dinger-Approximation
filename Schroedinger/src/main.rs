@@ -14,7 +14,7 @@ use crate::airy::airy_ai;
 
 const TRAPEZE_PER_THREAD: usize = 1000;
 const INTEG_STEPS: usize = 10000;
-const NUMBER_OF_POINTS: usize = 10000;
+const NUMBER_OF_POINTS: usize = 100000;
 const H_BAR: f64 = 1.0;
 const X_0: f64 = -10.0;
 const ENERGY: f64 = 20.0;
@@ -173,18 +173,8 @@ impl AiryWaveFunction {
         let airy_ai_2 = Ai(complex(u_1, 0.0).pow(1.0 / 3.0) * (t.1 - x_1));
         let airy_bi_2 = Bi(complex(u_1, 0.0).pow(1.0 / 3.0) * (t.1 - x_1));
 
-        let f1 = airy_ai_1;
-        let g1 = airy_bi_1;
-        let h1 = wkb_plus_1;
-        let k1 = wkb_minus_1;
-
-        let f2 = airy_ai_2;
-        let g2 = airy_bi_2;
-        let h2 = wkb_plus_2;
-        let k2 = wkb_minus_2;
-
-        let c_a = ((-c_wkb.1 * (g1 * k2 - g2 * k1)) / (f1 * g2 - f2 * g1)) - ((c_wkb.0 * (g1 * h2 - g2 * h1)) / (f1 * g2 - f2 * g1));
-        let c_b = ((c_wkb.1 * (f1 * k2 - f2 * k1)) / (f1 * g2 - f2 * g1)) + ((c_wkb.0 * (f1 * h2 - f2 * h1)) / (f1 * g2 - f2 * g1));
+        let c_a = ((-c_wkb.1 * (airy_bi_1 * wkb_minus_2 - airy_bi_2 * wkb_minus_1)) / (airy_ai_1 * airy_bi_2 - airy_ai_2 * airy_bi_1)) - ((c_wkb.0 * (airy_bi_1 * wkb_plus_2 - airy_bi_2 * wkb_plus_1)) / (airy_ai_1 * airy_bi_2 - airy_ai_2 * airy_bi_1));
+        let c_b = ((c_wkb.1 * (airy_ai_1 * wkb_minus_2 - airy_ai_2 * wkb_minus_1)) / (airy_ai_1 * airy_bi_2 - airy_ai_2 * airy_bi_1)) + ((c_wkb.0 * (airy_ai_1 * wkb_plus_2 - airy_ai_2 * wkb_plus_1)) / (airy_ai_1 * airy_bi_2 - airy_ai_2 * airy_bi_1));
 
         return (c_a, c_b);
     }
