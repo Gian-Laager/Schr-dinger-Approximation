@@ -31,37 +31,6 @@ impl AiryWaveFunction {
     }
 
     pub fn calc_ts(phase: &Phase) -> (f64, f64) {
-        let function = |x: &f64| -> f64 {
-            H_BAR / (2.0 * phase.mass).sqrt() * abs(derivative(&phase.potential, *x)) - ((phase.potential)(&x) - phase.energy).pow(2)
-        };
-
-        let mut zeros: Vec<f64> = vec![];
-
-        const INITIAL_NUMBER_OF_GUESSES: i64 = 100;
-        let guesses_result = (0..INITIAL_NUMBER_OF_GUESSES).into_par_iter()
-            .map(|i| index_to_range(i as f64, 0.0, INITIAL_NUMBER_OF_GUESSES as f64, VIEW.0, VIEW.1))
-            .map(|x: f64| (x, function(&x)))
-            .map(|(x, y)| (x, signum(y)))
-            .collect::<Vec<(f64, f64)>>();
-
-        let guessed_zeros_indices = guesses_result.iter()
-            .filter(|(x_, y)| *y == 0.0)
-            .map(|(x, y_)| zeros.push(*x));
-
-
-        let mut zeros_between: Vec<(f64, f64)> = vec![];
-
-        for i in 0..(guesses_result.len() - 1) {
-            if guesses_result[i].1 != guesses_result[i + 1].1
-            {
-                zeros_between.push((guesses_result[i].0, guesses_result[i + 1].0))
-            }
-        }
-
-        let zeros = zeros_between.iter().map(|(x1, x2)| (x1 + x2) / 2.0).map(|guess| newtons_method(&function, guess)).collect::<Vec<f64>>();
-
-        zeros_between.iter().for_each(|(x1, x2)| println!("between: {}, {}", x1, x2));
-
         let t1 = signum(X_0) * f64::sqrt(phase.energy + H_BAR * H_BAR / phase.mass + f64::sqrt(H_BAR * H_BAR * (H_BAR * H_BAR + 2.0 * phase.mass * phase.energy)) / phase.mass);
         let t2 = signum(X_0) * f64::sqrt(phase.energy + H_BAR * H_BAR / phase.mass - f64::sqrt(H_BAR * H_BAR * (H_BAR * H_BAR + 2.0 * phase.mass * phase.energy)) / phase.mass);
         return (t1, t2);
