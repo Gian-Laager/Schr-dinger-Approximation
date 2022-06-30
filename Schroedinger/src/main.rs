@@ -1,4 +1,5 @@
 mod airy;
+mod airy_wave_func;
 
 use std::f64;
 use std::fs::File;
@@ -45,7 +46,7 @@ impl ReToC for Function {
     }
 }
 
-struct Phase {
+pub struct Phase {
     energy: f64,
     mass: f64,
     potential: fn(&f64) -> f64,
@@ -131,7 +132,7 @@ fn evaluate_function_between(f: &dyn ReToC, a: f64, b: f64, n: usize) -> Vec<Poi
         .collect()
 }
 
-struct WaveFunction<'a> {
+pub struct WaveFunction<'a> {
     c_plus: f64,
     c_minus: f64,
     phase: &'a Phase,
