@@ -1,8 +1,17 @@
-use std::ops::{Add, Mul, Sub};
-use std::process::Output;
-use num::abs;
-use num::traits::MulAdd;
+use num::signum;
 use crate::*;
+
+fn Ai(x: Complex64) -> Complex64 {
+    let go_return;
+    unsafe {
+        go_return = airy_ai(x.re, x.im);
+    }
+    return complex(go_return.r0, go_return.r1);
+}
+
+fn Bi(x: Complex64) -> Complex64 {
+    return -complex(0.0, 1.0) * Ai(x) + 2.0 * Ai(x * complex(-0.5, 3.0_f64.sqrt() / 2.0)) * complex(3_f64.sqrt() / 2.0, 0.5);
+}
 
 pub struct AiryWaveFunction {
     pub c_a: Complex64,
@@ -58,36 +67,12 @@ impl ReToC for AiryWaveFunction {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
         let ai = self.c_a * Ai(u_1_cube_root * (x - self.x_1));
         let bi = self.c_b * Bi(u_1_cube_root * (x - self.x_1));
-        return (ai + bi);
+        return ai + bi;
     }
-}
-
-fn derivative<F>(f: &F, x: f64) -> f64
-    where F: Fn(&f64) -> f64 {
-    let epsilon = f64::EPSILON.sqrt() * x.abs().log2().round().exp2();
-    (f(&(x + epsilon / 2.0)) - f(&(x - epsilon / 2.0))) / epsilon
-}
-
-fn newtons_method<F>(f: &F, guess: f64) -> f64 where F: Fn(&f64) -> f64 {
-    let tolerance = f64::EPSILON.sqrt() * guess.abs().log2().round().exp2();
-    let shift = derivative(f, guess) / f(&guess);
-    if abs(shift) < tolerance {
-        return guess;
-    }
-    return newtons_method(f, guess - shift);
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    #[test]
-    fn derivative_test() {
-        let actual = |x| 2.0 * x;
-
-        for i in 0..100 {
-            let x = index_to_range(i as f64, 0.0, 100.0, -20.0, 20.0);
-            assert_eq!()
-        }
-    }
 }

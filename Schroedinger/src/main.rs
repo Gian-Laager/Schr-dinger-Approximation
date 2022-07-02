@@ -1,23 +1,20 @@
 mod airy;
+mod newtons_method;
 mod airy_wave_func;
 
 use std::f64;
 use std::fs::File;
 use std::io::Write;
-use std::mem::swap;
 use num::complex::{Complex64};
 use num::pow::Pow;
-use num::{Complex, signum};
-use num::integer::sqrt;
 use tokio;
 use rayon::iter::*;
-use scilib::math::bessel;
 use crate::airy::airy_ai;
 use crate::airy_wave_func::AiryWaveFunction;
 
 const TRAPEZE_PER_THREAD: usize = 1000;
-const INTEG_STEPS: usize = 10000;
-const NUMBER_OF_POINTS: usize = 100000;
+const INTEG_STEPS: usize = 1000;
+const NUMBER_OF_POINTS: usize = 10000;
 const H_BAR: f64 = 1.0;
 const X_0: f64 = 10.0;
 const ENERGY: f64 = 20.0;
@@ -78,18 +75,6 @@ fn trapezoidal_approx(start: &Point, end: &Point) -> Complex64 {
 
 fn index_to_range(x: f64, in_min: f64, in_max: f64, out_min: f64, out_max: f64) -> f64 {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
-
-fn Ai(x: Complex64) -> Complex64 {
-    let go_return;
-    unsafe {
-        go_return = airy_ai(x.re, x.im);
-    }
-    return complex(go_return.r0, go_return.r1);
-}
-
-fn Bi(x: Complex64) -> Complex64 {
-    return -complex(0.0, 1.0) * Ai(x) + 2.0 * Ai(x * complex(-0.5, 3.0_f64.sqrt() / 2.0)) * complex(3_f64.sqrt() / 2.0, 0.5);
 }
 
 struct Point {
@@ -275,7 +260,7 @@ mod test {
 
         let values_bi = evaluate_function_between(&airy_bi, -5.0, 2.0, NUMBER_OF_POINTS);
 
-        let data_str_bi: String = values.par_iter().map(|p| -> String {
+        let data_str_bi: String = values_bi.par_iter().map(|p| -> String {
             format!("{} {} {}\n", p.x, p.y.re, p.y.im)
         }).reduce(|| String::new(), |s: String, current: String| {
             s + &*current
