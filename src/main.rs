@@ -161,7 +161,8 @@ impl ReToC for WaveFunction<'_> {
 }
 
 fn square(x: &f64) -> f64 {
-    (x + 1.0) * (x - 1.0) * (x + 2.0) * (x - 2.0)
+    // (x + 1.0) * (x - 1.0) * (x + 2.0) * (x - 2.0)
+    x*x
 }
 
 fn order_ts((t1, t2): (f64, f64)) -> (f64, f64) {
