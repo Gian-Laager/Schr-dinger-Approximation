@@ -1,29 +1,28 @@
 mod airy;
-mod newtons_method;
 mod airy_wave_func;
+mod newtons_method;
 
+use crate::airy::airy_ai;
+use crate::airy_wave_func::AiryWaveFunction;
+use num::complex::Complex64;
+use num::pow::Pow;
+use rayon::iter::*;
 use std::f64;
 use std::fs::File;
 use std::io::Write;
-use num::complex::{Complex64};
-use num::pow::Pow;
 use tokio;
-use rayon::iter::*;
-use crate::airy::airy_ai;
-use crate::airy_wave_func::AiryWaveFunction;
 
 const TRAPEZE_PER_THREAD: usize = 1000;
 const INTEG_STEPS: usize = 10000;
 const NUMBER_OF_POINTS: usize = 10000;
 const H_BAR: f64 = 1.0;
-const X_0: f64 = -10.0;
+const X_0: f64 = 10.0;
 const ENERGY: f64 = 20.0;
 const MASS: f64 = 3.0;
 const C_0: f64 = 1.0;
 const THETA: f64 = 0.0;
 
-const VIEW: (f64, f64) = (-8.0, 2.0);
-
+const VIEW: (f64, f64) = (-2.0, 8.0);
 
 trait ReToC: Sync {
     fn eval(&self, x: &f64) -> Complex64;
@@ -45,6 +44,7 @@ impl ReToC for Function {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Phase {
     energy: f64,
     mass: f64,
@@ -53,16 +53,23 @@ pub struct Phase {
 
 impl Phase {
     const fn new(energy: f64, mass: f64, potential: fn(&f64) -> f64) -> Phase {
-        return Phase { energy, mass, potential };
+        return Phase {
+            energy,
+            mass,
+            potential,
+        };
     }
 }
 
 impl ReToC for Phase {
     fn eval(&self, x: &f64) -> Complex64 {
-        return (complex(2.0, 0.0) * complex(self.mass, 0.0) * complex((self.potential)(x) - self.energy, 0.0)).sqrt() / complex(H_BAR, 0.0);
+        return (complex(2.0, 0.0)
+            * complex(self.mass, 0.0)
+            * complex((self.potential)(x) - self.energy, 0.0))
+        .sqrt()
+            / complex(H_BAR, 0.0);
     }
 }
-
 
 fn complex(re: f64, im: f64) -> Complex64 {
     return Complex64 { re, im };
@@ -71,7 +78,6 @@ fn complex(re: f64, im: f64) -> Complex64 {
 fn trapezoidal_approx(start: &Point, end: &Point) -> Complex64 {
     return complex(end.x - start.x, 0.0) * (start.y + end.y) / complex(2.0, 0.0);
 }
-
 
 fn index_to_range(x: f64, in_min: f64, in_max: f64, out_min: f64, out_max: f64) -> f64 {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
@@ -89,7 +95,8 @@ fn integrate(points: Vec<Point>, batch_size: usize) -> Complex64 {
 
     let batches: Vec<&[Point]> = points.chunks(batch_size).collect();
 
-    let parallel: Complex64 = batches.par_iter()
+    let parallel: Complex64 = batches
+        .par_iter()
         .map(|batch| {
             let mut sum = complex(0.0, 0.0);
             for i in 0..(batch.len() - 1) {
@@ -113,7 +120,8 @@ fn evaluate_function_between(f: &dyn ReToC, a: f64, b: f64, n: usize) -> Vec<Poi
         return vec![];
     }
 
-    (0..n).into_par_iter()
+    (0..n)
+        .into_par_iter()
         .map(|i| index_to_range(i as f64, 0.0, n as f64 - 1.0, a, b))
         .map(|x| Point { x, y: f.eval(&x) })
         .collect()
@@ -130,28 +138,34 @@ impl WaveFunction<'_> {
     fn new(phase: &Phase, c0: f64, theta: f64, integration_steps: usize) -> WaveFunction {
         let c_plus = 0.5 * c0 * f64::cos(theta - std::f64::consts::PI / 4.0);
         let c_minus = -0.5 * c0 * f64::sin(theta - std::f64::consts::PI / 4.0);
-        return WaveFunction { c_plus, c_minus, phase, integration_steps };
+        return WaveFunction {
+            c_plus,
+            c_minus,
+            phase,
+            integration_steps,
+        };
     }
 }
 
 impl ReToC for WaveFunction<'_> {
     fn eval(&self, x: &f64) -> Complex64 {
-        let integral = integrate(evaluate_function_between(self.phase, X_0, *x, self.integration_steps), TRAPEZE_PER_THREAD);
+        let integral = integrate(
+            evaluate_function_between(self.phase, X_0, *x, self.integration_steps),
+            TRAPEZE_PER_THREAD,
+        );
 
-        return (complex(self.c_plus, 0.0) * integral.exp() + complex(self.c_minus, 0.0) * (-integral).exp()) / (self.phase.eval(&x)).sqrt();
+        return (complex(self.c_plus, 0.0) * integral.exp()
+            + complex(self.c_minus, 0.0) * (-integral).exp())
+            / (self.phase.eval(&x)).sqrt();
     }
 }
 
 fn square(x: &f64) -> f64 {
-    return x * x;
+    (x + 1.0) * (x - 1.0) * (x + 2.0) * (x - 2.0)
 }
 
 fn order_ts((t1, t2): (f64, f64)) -> (f64, f64) {
-    return if t1 > t2 {
-        (t2, t1)
-    } else {
-        (t1, t2)
-    };
+    return if t1 > t2 { (t2, t1) } else { (t1, t2) };
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -159,26 +173,27 @@ async fn main() {
     let phase: Phase = Phase::new(ENERGY, MASS, square);
     let wave_func = WaveFunction::new(&phase, C_0, THETA, INTEG_STEPS);
     let values = evaluate_function_between(&wave_func, VIEW.0, VIEW.1, NUMBER_OF_POINTS);
-    let (t1, t2) = order_ts(AiryWaveFunction::calc_ts(&phase));
+    let (t1, t2) = order_ts(AiryWaveFunction::calc_ts(&phase, VIEW));
 
     let mut data_file = File::create("data.txt").unwrap();
 
-    let data_str: String = values.par_iter().filter(|p| p.x < t1 || p.x > t2).map(|p| -> String {
-        format!("{} {} {}\n", p.x, p.y.re, p.y.im)
-    }).reduce(|| String::new(), |s: String, current: String| {
-        s + &*current
-    });
+    let data_str: String = values
+        .par_iter()
+        .filter(|p| p.x < t1 || p.x > t2)
+        .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
+        .reduce(|| String::new(), |s: String, current: String| s + &*current);
 
-    let airy_wave_func = AiryWaveFunction::new(&wave_func);
+    let airy_wave_func = AiryWaveFunction::new(&wave_func, VIEW);
 
     let airy_values = evaluate_function_between(&airy_wave_func, t1, t2, NUMBER_OF_POINTS);
 
-    let airy_data_str: String = airy_values.par_iter().map(|p| -> String {
-        format!("{} {} {}\n", p.x, p.y.re, p.y.im)
-    }).reduce(|| String::new(), |s: String, current: String| {
-        s + &*current
-    });
-    data_file.write_all((data_str + "\n\n" + &*airy_data_str).as_ref()).unwrap()
+    let airy_data_str: String = airy_values
+        .par_iter()
+        .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
+        .reduce(|| String::new(), |s: String, current: String| s + &*current);
+    data_file
+        .write_all((data_str + "\n\n" + &*airy_data_str).as_ref())
+        .unwrap()
 }
 
 #[cfg(test)]
@@ -207,26 +222,55 @@ mod test {
                 let b = f64::from(j - 50) / 12.3;
 
                 if i == j {
-                    assert_eq!(integrate(evaluate_function_between(&SQUARE_FUNC, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), complex(0.0, 0.0));
+                    assert_eq!(
+                        integrate(
+                            evaluate_function_between(&SQUARE_FUNC, a, b, INTEG_STEPS),
+                            TRAPEZE_PER_THREAD
+                        ),
+                        complex(0.0, 0.0)
+                    );
                     continue;
                 }
 
                 let epsilon = 0.00001;
-                assert!(float_compare(integrate(evaluate_function_between(&SQUARE_FUNC, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), square_itegral(a, b), epsilon));
+                assert!(float_compare(
+                    integrate(
+                        evaluate_function_between(&SQUARE_FUNC, a, b, INTEG_STEPS),
+                        TRAPEZE_PER_THREAD
+                    ),
+                    square_itegral(a, b),
+                    epsilon
+                ));
             }
         }
     }
-
 
     #[test]
     fn evaluate_square_func_between() {
         static SQUARE_FUNC: Function = Function::new(square);
         let actual = evaluate_function_between(&SQUARE_FUNC, -2.0, 2.0, 5);
-        let expected = vec![Point { x: -2.0, y: complex(4.0, 0.0) },
-                            Point { x: -1.0, y: complex(1.0, 0.0) },
-                            Point { x: 0.0, y: complex(0.0, 0.0) },
-                            Point { x: 1.0, y: complex(1.0, 0.0) },
-                            Point { x: 2.0, y: complex(4.0, 0.0) }];
+        let expected = vec![
+            Point {
+                x: -2.0,
+                y: complex(4.0, 0.0),
+            },
+            Point {
+                x: -1.0,
+                y: complex(1.0, 0.0),
+            },
+            Point {
+                x: 0.0,
+                y: complex(0.0, 0.0),
+            },
+            Point {
+                x: 1.0,
+                y: complex(1.0, 0.0),
+            },
+            Point {
+                x: 2.0,
+                y: complex(4.0, 0.0),
+            },
+        ];
 
         for (a, e) in actual.iter().zip(expected) {
             assert_eq!(a.x, e.x);
@@ -243,8 +287,6 @@ mod test {
         return complex(-0.5, 0.5) * (complex(a, a).exp() - complex(b, b).exp());
     }
 
-
-
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_sinusoidal_exp() {
         static SINUSOIDAL_EXP_COMPLEX: Function = Function::new(sinusoidal_exp_complex);
@@ -254,11 +296,24 @@ mod test {
                 let b = f64::from(j - 50) / 12.3;
 
                 if i == j {
-                    assert_eq!(integrate(evaluate_function_between(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), complex(0.0, 0.0));
+                    assert_eq!(
+                        integrate(
+                            evaluate_function_between(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS),
+                            TRAPEZE_PER_THREAD
+                        ),
+                        complex(0.0, 0.0)
+                    );
                     continue;
                 }
                 let epsilon = 0.0001;
-                assert!(float_compare(integrate(evaluate_function_between(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS), TRAPEZE_PER_THREAD), sinusoidal_exp_complex_integral(a, b), epsilon));
+                assert!(float_compare(
+                    integrate(
+                        evaluate_function_between(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS),
+                        TRAPEZE_PER_THREAD
+                    ),
+                    sinusoidal_exp_complex_integral(a, b),
+                    epsilon
+                ));
             }
         }
     }
