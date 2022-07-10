@@ -259,7 +259,7 @@ mod test {
     async fn integral_of_square() {
         static SQUARE_FUNC: Function = Function::new(square);
         for i in 0..100 {
-            for j in 0..100 {
+            for j in 0..10 {
                 let a = f64::from(i - 50) / 12.3;
                 let b = f64::from(j - 50) / 12.3;
 
@@ -332,8 +332,8 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_sinusoidal_exp() {
         static SINUSOIDAL_EXP_COMPLEX: Function = Function::new(sinusoidal_exp_complex);
-        for i in 0..100 {
-            for j in 0..100 {
+        for i in 0..10 {
+            for j in 0..10 {
                 let a = f64::from(i - 50) / 12.3;
                 let b = f64::from(j - 50) / 12.3;
 
