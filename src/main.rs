@@ -17,13 +17,13 @@ const TRAPEZE_PER_THREAD: usize = 1000;
 const INTEG_STEPS: usize = 10000;
 const NUMBER_OF_POINTS: usize = 10000;
 const H_BAR: f64 = 1.0;
-const X_0: f64 = 10.0;
+const X_0: f64 = 8.0;
 const ENERGY: f64 = 20.0;
 const MASS: f64 = 3.0;
 const C_0: f64 = 1.0;
 const THETA: f64 = 0.0;
 
-const VIEW: (f64, f64) = (-2.0, 8.0);
+const VIEW: (f64, f64) = (-8.0, 8.0);
 
 trait ReToC: Sync {
     fn eval(&self, x: &f64) -> Complex64;
@@ -50,14 +50,16 @@ pub struct Phase {
     energy: f64,
     mass: f64,
     potential: fn(&f64) -> f64,
+    x_0: f64,
 }
 
 impl Phase {
-    const fn new(energy: f64, mass: f64, potential: fn(&f64) -> f64) -> Phase {
+    const fn new(energy: f64, mass: f64, potential: fn(&f64) -> f64, x_0: f64) -> Phase {
         return Phase {
             energy,
             mass,
             potential,
+            x_0
         };
     }
 }
@@ -151,7 +153,7 @@ impl WaveFunction<'_> {
 impl ReToC for WaveFunction<'_> {
     fn eval(&self, x: &f64) -> Complex64 {
         let integral = integrate(
-            evaluate_function_between(self.phase, X_0, *x, self.integration_steps),
+            evaluate_function_between(self.phase, self.phase.x_0, *x, self.integration_steps),
             TRAPEZE_PER_THREAD,
         );
 
@@ -166,36 +168,74 @@ fn square(x: &f64) -> f64 {
     x * x
 }
 
-fn order_ts((t1, t2): (f64, f64)) -> (f64, f64) {
-    return if t1 > t2 { (t2, t1) } else { (t1, t2) };
+fn order_ts((t1, t2): &(f64, f64)) -> (f64, f64) {
+    return if t1 > t2 { (*t2, *t1) } else { (*t1, *t2) };
 }
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    let phase: Phase = Phase::new(ENERGY, MASS, square);
-    let wave_func = WaveFunction::new(&phase, C_0, THETA, INTEG_STEPS);
-    let values = evaluate_function_between(&wave_func, VIEW.0, VIEW.1, NUMBER_OF_POINTS);
-    let (t1, t2) = order_ts(AiryWaveFunction::calc_ts(&phase, VIEW));
+    let phase1: Phase = Phase::new(ENERGY, MASS, square, -X_0);
+    let wave_func1 = WaveFunction::new(&phase1, C_0, THETA, INTEG_STEPS);
+    let values1 = evaluate_function_between(&wave_func1, VIEW.0, 0.0, NUMBER_OF_POINTS);
+    let phase2: Phase = Phase::new(ENERGY, MASS, square, X_0);
+    let wave_func2 = WaveFunction::new(&phase2, C_0, THETA, INTEG_STEPS);
+    let values2 = evaluate_function_between(&wave_func2, 0.0, VIEW.1, NUMBER_OF_POINTS);
+    let turning_point_boundaries = &AiryWaveFunction::calc_ts(&phase1, VIEW).ts;
 
     let mut data_file = File::create("data.txt").unwrap();
 
-    let data_str: String = values
+    let mut data_str: String = values1
         .par_iter()
-        .filter(|p| p.x < t1 || p.x > t2)
+        .filter(|p| {
+            (turning_point_boundaries.clone()).map(|ts| ts.iter()
+                .map(order_ts)
+                .map(|(t1, t2)| p.x < t1 || p.x > t2)
+                .fold(true, |a, b| a && b))
+                .unwrap_or(true)
+        })
         .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
         .reduce(|| String::new(), |s: String, current: String| s + &*current);
 
-    let airy_wave_func = AiryWaveFunction::new(&wave_func, VIEW);
-
-    let airy_values = evaluate_function_between(&airy_wave_func, t1, t2, NUMBER_OF_POINTS);
-
-    let airy_data_str: String = airy_values
+    data_str.push_str(&*values2
         .par_iter()
+        .filter(|p| {
+            (turning_point_boundaries.clone()).map(|ts| ts.iter()
+                .map(order_ts)
+                .map(|(t1, t2)| p.x < t1 || p.x > t2)
+                .fold(true, |a, b| a && b))
+                .unwrap_or(true)
+        })
         .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
-        .reduce(|| String::new(), |s: String, current: String| s + &*current);
+        .reduce(|| String::new(), |s: String, current: String| s + &*current));
+
+    let airy_wave_funcs = AiryWaveFunction::new(&wave_func1, (VIEW.0, 0.0));
+
+    let airy_data_str = airy_wave_funcs.iter().map(|airy_wave_func| {
+        let airy_values = evaluate_function_between(airy_wave_func, airy_wave_func.ts.0, airy_wave_func.ts.1, NUMBER_OF_POINTS);
+
+        airy_values
+            .par_iter()
+            .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
+            .reduce(|| String::new(), |s: String, current: String| s + &*current)
+    })
+        .fold(String::new(), |s: String, current: String| s + "\n\n" + &*current);
+    data_str.push_str(&*airy_data_str);
+
+    let airy_wave_funcs = AiryWaveFunction::new(&wave_func2, (0.0, VIEW.1));
+
+    let airy_data_str = airy_wave_funcs.iter().map(|airy_wave_func| {
+        let airy_values = evaluate_function_between(airy_wave_func, airy_wave_func.ts.0, airy_wave_func.ts.1, NUMBER_OF_POINTS);
+
+        airy_values
+            .par_iter()
+            .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
+            .reduce(|| String::new(), |s: String, current: String| s + &*current)
+    })
+        .fold(String::new(), |s: String, current: String| s + "\n\n" + &*current);
+    data_str.push_str(&*airy_data_str);
+
     data_file
-        .write_all((data_str + "\n\n" + &*airy_data_str).as_ref())
-        .unwrap()
+        .write_all((data_str).as_ref()).unwrap();
 }
 
 #[cfg(test)]
