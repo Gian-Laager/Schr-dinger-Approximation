@@ -248,38 +248,33 @@ mod test {
     }
 
     #[test]
-    fn newtons_method_find_next_sin() {
+    fn newtons_method_find_next_test() {
         use std::f64::consts;
         let interval = (-10.0, 10.0);
 
-        let test_func = |x: f64| x.sin() * (x - 2.0 * consts::PI);
+        let test_func = |x: f64| 5.0 * (3.0 * x + 1.0).abs() - (1.5 * x.powi(2) + x - 50.0).powi(2);
 
         let mut finder = NewtonsMethodFindNewZero::new(
             &test_func,
-            1e-15,
+            1e-11,
             100000000,
         );
 
-        for i in 0..7 {
+        for i in 0..4 {
             let guess = make_guess(&|x| finder.modified_func(x), interval, 1000);
-            println!("guess: {}", guess.unwrap());
             finder.next_zero(guess.unwrap());
         }
 
-        let zeros = finder.get_previous_zeros().clone();
+        let mut zeros = finder.get_previous_zeros().clone();
+        zeros.sort_by(cmp_f64);
+        let expected = [-6.65276132415, -5.58024707627, 4.91358040961, 5.98609465748];
+
         println!("zeros: {:#?}", zeros);
 
-        for i in 0..zeros.len() {
-            for j in 0..zeros.len() {
-                if i != j {
-                    assert!((zeros[i] - zeros[j]).abs() > 1.0);
-                }
-            }
-        }
+        assert_eq!(zeros.len(), expected.len());
 
-        zeros.iter().for_each(|z| {
-            println!("{}, {}", z, (z.abs() / consts::PI) % 1.0);
-            assert!((z.abs() / consts::PI) % 1.0 < 1e-3 || 1.0 - (z.abs() / consts::PI) % 1.0 < 1e-10);
-        });
+        for (expected, actual) in expected.iter().zip(zeros.iter()) {
+            assert!((*expected - *actual).abs() < 1e-10);
+        }
     }
 }
