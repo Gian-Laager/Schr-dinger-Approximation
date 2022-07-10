@@ -1,4 +1,5 @@
 mod airy;
+mod utils;
 mod airy_wave_func;
 mod newtons_method;
 
@@ -66,7 +67,7 @@ impl ReToC for Phase {
         return (complex(2.0, 0.0)
             * complex(self.mass, 0.0)
             * complex((self.potential)(x) - self.energy, 0.0))
-        .sqrt()
+            .sqrt()
             / complex(H_BAR, 0.0);
     }
 }
@@ -161,8 +162,8 @@ impl ReToC for WaveFunction<'_> {
 }
 
 fn square(x: &f64) -> f64 {
-    // (x + 1.0) * (x - 1.0) * (x + 2.0) * (x - 2.0)
-    x*x
+    // 5.0 * (x + 1.0) * (x - 1.0) * (x + 2.0) * (x - 2.0) - 1.0
+    x * x
 }
 
 fn order_ts((t1, t2): (f64, f64)) -> (f64, f64) {
@@ -226,7 +227,7 @@ mod test {
                     assert_eq!(
                         integrate(
                             evaluate_function_between(&SQUARE_FUNC, a, b, INTEG_STEPS),
-                            TRAPEZE_PER_THREAD
+                            TRAPEZE_PER_THREAD,
                         ),
                         complex(0.0, 0.0)
                     );
@@ -237,10 +238,10 @@ mod test {
                 assert!(float_compare(
                     integrate(
                         evaluate_function_between(&SQUARE_FUNC, a, b, INTEG_STEPS),
-                        TRAPEZE_PER_THREAD
+                        TRAPEZE_PER_THREAD,
                     ),
                     square_itegral(a, b),
-                    epsilon
+                    epsilon,
                 ));
             }
         }
@@ -300,7 +301,7 @@ mod test {
                     assert_eq!(
                         integrate(
                             evaluate_function_between(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS),
-                            TRAPEZE_PER_THREAD
+                            TRAPEZE_PER_THREAD,
                         ),
                         complex(0.0, 0.0)
                     );
@@ -310,10 +311,10 @@ mod test {
                 assert!(float_compare(
                     integrate(
                         evaluate_function_between(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS),
-                        TRAPEZE_PER_THREAD
+                        TRAPEZE_PER_THREAD,
                     ),
                     sinusoidal_exp_complex_integral(a, b),
-                    epsilon
+                    epsilon,
                 ));
             }
         }

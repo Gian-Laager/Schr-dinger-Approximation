@@ -1,9 +1,10 @@
-use crate::newtons_method::derivative;
+use crate::newtons_method::{derivative, make_guess, newtons_method_find_new_zero, NewtonsMethodFindNewZero};
 use crate::newtons_method::newtons_method;
 use crate::newtons_method::newtons_method_max_iters;
 use crate::*;
 use num::signum;
 use std::cmp::Ordering;
+use crate::utils::cmp_f64;
 
 fn Ai(x: Complex64) -> Complex64 {
     let go_return;
@@ -18,6 +19,7 @@ fn Bi(x: Complex64) -> Complex64 {
         + 2.0 * Ai(x * complex(-0.5, 3.0_f64.sqrt() / 2.0)) * complex(3_f64.sqrt() / 2.0, 0.5);
 }
 
+#[derive(Debug)]
 struct TGroup {
     t0: Option<f64>,
     ts: Option<Vec<(f64, f64)>>,
@@ -40,6 +42,14 @@ impl TGroup {
             self.ts = Some(vec![new_t]);
         }
     }
+
+    pub fn set_t0(&mut self, t: f64) {
+        self.t0 = Some(t);
+    }
+
+    pub fn set_tn(&mut self, t: f64) {
+        self.tn = Some(t);
+    }
 }
 
 pub struct AiryWaveFunction {
@@ -50,14 +60,6 @@ pub struct AiryWaveFunction {
     ts: TGroup,
 }
 
-fn cmp_f64(a: &f64, b: &f64) -> Ordering {
-    if a < b {
-        return Ordering::Less;
-    } else if a > b {
-        return Ordering::Greater;
-    }
-    return Ordering::Equal;
-}
 
 fn validity_func(phase: Phase) -> Box<dyn Fn(f64) -> f64> {
     Box::new(move |x: f64| {
@@ -83,25 +85,25 @@ impl AiryWaveFunction {
             evaluate_function_between(phase, X_0, t.0, INTEG_STEPS),
             TRAPEZE_PER_THREAD,
         )
-        .exp()
+            .exp()
             / phase.eval(&t.0).sqrt();
         let wkb_minus_1 = (-integrate(
             evaluate_function_between(phase, X_0, t.0, INTEG_STEPS),
             TRAPEZE_PER_THREAD,
         ))
-        .exp()
+            .exp()
             / phase.eval(&t.0).sqrt();
         let wkb_plus_2 = integrate(
             evaluate_function_between(phase, X_0, t.1, INTEG_STEPS),
             TRAPEZE_PER_THREAD,
         )
-        .exp()
+            .exp()
             / phase.eval(&t.1).sqrt();
         let wkb_minus_2 = (-integrate(
             evaluate_function_between(phase, X_0, t.1, INTEG_STEPS),
             TRAPEZE_PER_THREAD,
         ))
-        .exp()
+            .exp()
             / phase.eval(&t.1).sqrt();
 
         let airy_ai_1 = Ai(u_1_cube_root * (t.0 - x_1));
@@ -112,57 +114,74 @@ impl AiryWaveFunction {
         let c_a = ((-c_wkb.1 * (airy_bi_1 * wkb_minus_2 - airy_bi_2 * wkb_minus_1))
             / (airy_ai_1 * airy_bi_2 - airy_ai_2 * airy_bi_1))
             - ((c_wkb.0 * (airy_bi_1 * wkb_plus_2 - airy_bi_2 * wkb_plus_1))
-                / (airy_ai_1 * airy_bi_2 - airy_ai_2 * airy_bi_1));
+            / (airy_ai_1 * airy_bi_2 - airy_ai_2 * airy_bi_1));
         let c_b = ((c_wkb.1 * (airy_ai_1 * wkb_minus_2 - airy_ai_2 * wkb_minus_1))
             / (airy_ai_1 * airy_bi_2 - airy_ai_2 * airy_bi_1))
             + ((c_wkb.0 * (airy_ai_1 * wkb_plus_2 - airy_ai_2 * wkb_plus_1))
-                / (airy_ai_1 * airy_bi_2 - airy_ai_2 * airy_bi_1));
+            / (airy_ai_1 * airy_bi_2 - airy_ai_2 * airy_bi_1));
 
         return (c_a, c_b);
     }
 
-    fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
+    fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> (f64, f64) {
         let mut zeros = zeros.clone();
         zeros.sort_by(cmp_f64);
-        let derivatives = zeros
+        let mut derivatives = zeros
             .iter()
-            .map(|x| validity_func(phase.clone())(*x))
+            .map(|x| derivative(&validity_func(phase.clone()), *x))
             .map(signum)
             .collect::<Vec<f64>>();
 
-        if let Some(first) = derivatives.get(0) {
-            if let Some(second) = derivatives.get(1) {
-                todo!();
-            } else {
-                return TGroup {
-                    t0: Some(*first),
-                    ts: None,
-                    tn: None,
-                };
-            }
-        }
-
-        todo!();
-    }
-
-    fn get_guess_for_ts(phase: &Phase, view: (f64, f64)) -> (f64, f64) {
-        const MAX_TURNING_POINTS: i32 = 64;
-        const ACCURACY: f64 = 1e-15;
-        let zeros = (0..MAX_TURNING_POINTS)
-            .into_par_iter()
-            .map(|i| index_to_range(i as f64, 0.0, MAX_TURNING_POINTS as f64, view.0, view.1))
-            .map(|x| newtons_method_max_iters(&validity_func(phase.clone()), x, ACCURACY, 10000))
-            .collect::<Vec<Option<f64>>>();
-
-        let mut unique_zeros = vec![];
-
         let mut result = TGroup::new();
 
-        for z in zeros.iter().flatten() {
-            if !unique_zeros.iter().any(|w: &f64| (w - *z).abs() < ACCURACY) {
-                unique_zeros.push(*z);
+        if let Some(first) = derivatives.get(0) {
+            if derivatives.get(1).is_some() {
+                if *first == -1.0 {
+                    result.set_t0(zeros[0]);
+                    derivatives.remove(0);
+                }
             }
         }
+
+        if derivatives.len() % 2 != 0 {
+            result.set_tn(zeros[zeros.len() - 1]);
+            zeros.remove(zeros.len() - 1);
+            derivatives.remove(derivatives.len() - 1);
+        }
+
+
+        for (i, derivative) in derivatives.iter().enumerate().step_by(2) {
+            result.add_ts((zeros[i], zeros[i + 1]));
+        }
+
+        println!("{:?}", result);
+        return result;
+    }
+
+    fn get_ts(phase: &Phase, view: (f64, f64)) -> (f64, f64) {
+        const MAX_TURNING_POINTS: usize = 256;
+        const ACCURACY: f64 = 1e-10;
+        let mut zeros = NewtonsMethodFindNewZero::new(
+            validity_func(phase.clone()),
+            ACCURACY,
+            10000
+        );
+
+        (0..MAX_TURNING_POINTS)
+            .into_iter()
+            .for_each(|i| {
+
+                // let zeros_clone = zeros.clone();
+                let modified_func  =  |x| zeros.modified_func(x);
+
+                let guess = make_guess(&modified_func, view, 1000);
+                guess.map(|g| zeros.next_zero(g));
+            });
+
+        let view = if view.0 < view.1 { view } else { (view.1, view.0) };
+        let mut unique_zeros = zeros.get_previous_zeros().iter().filter(|x| **x > view.0 && **x < view.1).map(|x| *x).collect::<Vec<f64>>();
+
+        let tgrouped = Self::group_ts(&unique_zeros, phase);
 
         return (unique_zeros[0], unique_zeros[1]);
     }
