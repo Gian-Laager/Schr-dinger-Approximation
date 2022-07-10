@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use crate::Complex64;
 
 pub fn cmp_f64(a: &f64, b: &f64) -> Ordering {
     if a < b {
@@ -7,4 +8,8 @@ pub fn cmp_f64(a: &f64, b: &f64) -> Ordering {
         return Ordering::Greater;
     }
     return Ordering::Equal;
+}
+
+pub fn complex(re: f64, im: f64) -> Complex64 {
+    return Complex64 { re, im };
 }

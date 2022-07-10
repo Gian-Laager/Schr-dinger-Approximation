@@ -4,7 +4,7 @@ use std::ops::*;
 use std::rc::Rc;
 use std::sync::Arc;
 use rayon::prelude::*;
-use crate::{index_to_range, utils};
+use crate::integrals::*;
 use crate::utils::cmp_f64;
 
 pub fn derivative<F, R>(f: &F, x: f64) -> R
@@ -135,8 +135,8 @@ pub fn newtons_method_find_new_zero<F>(
 mod test {
     use num::zero;
     use super::*;
-    use crate::index_to_range;
     use crate::utils::cmp_f64;
+    use crate::integrals::*;
 
     fn float_compare(expect: f64, actual: f64, epsilon: f64) -> bool {
         let average = (expect.abs() + actual.abs()) / 2.0;
