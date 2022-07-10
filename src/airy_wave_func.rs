@@ -182,7 +182,7 @@ impl AiryWaveFunction {
         return Self::group_ts(&unique_zeros, phase);
     }
 
-    pub fn new(wave_func: &WaveFunction, view: (f64, f64)) -> Vec<AiryWaveFunction> {
+    pub fn new(wave_func: &WkbWaveFunction, view: (f64, f64)) -> Vec<AiryWaveFunction> {
         let phase = wave_func.phase;
         let turning_point_boundaries = AiryWaveFunction::calc_ts(phase, view);
 

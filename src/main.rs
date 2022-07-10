@@ -130,18 +130,18 @@ fn evaluate_function_between(f: &dyn ReToC, a: f64, b: f64, n: usize) -> Vec<Poi
         .collect()
 }
 
-pub struct WaveFunction<'a> {
+pub struct WkbWaveFunction<'a> {
     c_plus: f64,
     c_minus: f64,
     phase: &'a Phase,
     integration_steps: usize,
 }
 
-impl WaveFunction<'_> {
-    fn new(phase: &Phase, c0: f64, theta: f64, integration_steps: usize) -> WaveFunction {
+impl WkbWaveFunction<'_> {
+    fn new(phase: &Phase, c0: f64, theta: f64, integration_steps: usize) -> WkbWaveFunction {
         let c_plus = 0.5 * c0 * f64::cos(theta - std::f64::consts::PI / 4.0);
         let c_minus = -0.5 * c0 * f64::sin(theta - std::f64::consts::PI / 4.0);
-        return WaveFunction {
+        return WkbWaveFunction {
             c_plus,
             c_minus,
             phase,
@@ -150,7 +150,7 @@ impl WaveFunction<'_> {
     }
 }
 
-impl ReToC for WaveFunction<'_> {
+impl ReToC for WkbWaveFunction<'_> {
     fn eval(&self, x: &f64) -> Complex64 {
         let integral = integrate(
             evaluate_function_between(self.phase, self.phase.x_0, *x, self.integration_steps),
@@ -175,10 +175,10 @@ fn order_ts((t1, t2): &(f64, f64)) -> (f64, f64) {
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let phase1: Phase = Phase::new(ENERGY, MASS, square, -X_0);
-    let wave_func1 = WaveFunction::new(&phase1, C_0, THETA, INTEG_STEPS);
+    let wave_func1 = WkbWaveFunction::new(&phase1, C_0, THETA, INTEG_STEPS);
     let values1 = evaluate_function_between(&wave_func1, VIEW.0, 0.0, NUMBER_OF_POINTS);
     let phase2: Phase = Phase::new(ENERGY, MASS, square, X_0);
-    let wave_func2 = WaveFunction::new(&phase2, C_0, THETA, INTEG_STEPS);
+    let wave_func2 = WkbWaveFunction::new(&phase2, C_0, THETA, INTEG_STEPS);
     let values2 = evaluate_function_between(&wave_func2, 0.0, VIEW.1, NUMBER_OF_POINTS);
     let turning_point_boundaries = &AiryWaveFunction::calc_ts(&phase1, VIEW).ts;
 
