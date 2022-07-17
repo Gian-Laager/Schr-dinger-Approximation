@@ -1,11 +1,102 @@
 use std::cmp::Ordering;
+use std::fmt::Debug;
 use num::Float;
 use std::ops::*;
 use std::rc::Rc;
 use std::sync::Arc;
+use num::traits::FloatConst;
 use rayon::prelude::*;
 use crate::integrals::*;
 use crate::utils::cmp_f64;
+
+#[derive(Default, Debug)]
+pub struct Vec2 {
+    x: f64,
+    y: f64,
+}
+
+impl Vec2 {
+    pub fn dot(&self, other: &Vec2) -> f64 {
+        return self.x * other.x + self.y + other.y;
+    }
+
+    pub fn mag(&self) -> f64 {
+        return (self.x.powi(2) * self.y.powi(2)).sqrt();
+    }
+
+    pub fn pseudo_inverse(&self) -> CoVec2 {
+        CoVec2(self.x, self.y) * (1.0 / (self.x.powi(2) + self.y.powi(2)))
+    }
+}
+
+impl Add for Vec2 {
+    type Output = Vec2;
+
+    fn add(self, other: Self) -> Self::Output {
+        Vec2 { x: self.x + other.x, y: self.y + other.y }
+    }
+}
+
+impl Sub for Vec2 {
+    type Output = Vec2;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Vec2 { x: self.x - other.x, y: self.x - other.y }
+    }
+}
+
+impl Mul<f64> for Vec2 {
+    type Output = Vec2;
+
+    fn mul(self, s: f64) -> Self::Output {
+        Vec2 { x: self.x * s, y: self.y * s }
+    }
+}
+
+#[derive(Debug)]
+pub struct CoVec2(f64, f64);
+
+
+impl Add for CoVec2 {
+    type Output = CoVec2;
+
+    fn add(self, other: Self) -> Self::Output {
+        CoVec2(self.0 + other.0, self.1 + other.1)
+    }
+}
+
+impl Sub for CoVec2 {
+    type Output = CoVec2;
+
+    fn sub(self, other: Self) -> Self::Output {
+        CoVec2(self.0 - other.0, self.1 - other.1)
+    }
+}
+
+impl Mul<Vec2> for CoVec2 {
+    type Output = f64;
+
+    fn mul(self, vec: Vec2) -> Self::Output {
+        return self.0 * vec.x + self.1 * vec.y;
+    }
+}
+
+impl Mul<f64> for CoVec2 {
+    type Output = CoVec2;
+
+    fn mul(self, s: f64) -> Self::Output {
+        CoVec2(self.0 * s, self.1 * s)
+    }
+}
+
+fn gradient<F>(f: F, x: f64) -> Vec2 where F: Fn(f64) -> Vec2 {
+    let x_component = |x| f(x).x;
+    let y_component = |x| f(x).y;
+    return Vec2 {
+        x: derivative(&x_component, x),
+        y: derivative(&y_component, x),
+    };
+}
 
 pub fn derivative<F, R>(f: &F, x: f64) -> R
     where
@@ -30,6 +121,24 @@ pub fn newtons_method<F>(f: &F, mut guess: f64, precision: f64) -> f64
     }
 }
 
+pub fn newtons_method_2d<F>(f: &F, mut guess: f64, precision: f64) -> f64
+    where
+        F: Fn(f64) -> Vec2, F::Output: Debug
+{
+    loop {
+        let jacobian = gradient(f, guess);
+        println!("guess: {:?}", guess);
+        println!("f(guess): {:?}", f(guess));
+        println!("inverse jacobian: {:?}", jacobian.pseudo_inverse());
+        let step: f64 = jacobian.pseudo_inverse() * f(guess);
+        if step.abs() < precision {
+            return guess;
+        } else {
+            guess -= step;;
+        }
+    }
+}
+
 pub fn newtons_method_max_iters<F>(
     f: &F,
     mut guess: f64,
@@ -48,6 +157,28 @@ pub fn newtons_method_max_iters<F>(
         }
     }
     None
+}
+
+fn sigmoid(x: f64) -> f64 {
+    1.0 / (1.0 + (-x).exp())
+}
+
+fn smooth_sgn(x: f64) -> f64 {
+    if x > 0.0 {
+        (x + 3.0).exp() - 3.0.exp()
+    } else {
+        0.0
+    }
+}
+
+pub fn newtons_method_maxima<F>(f: &F, initial_guess: f64, precision: f64) -> f64 where F: Fn(f64) -> f64 {
+    let f_deriv = |x| derivative(f, x);
+    let func_to_solve = |x| Vec2{
+        x: f_deriv(x),
+        y: smooth_sgn(derivative(&f_deriv, x))
+    };
+
+    return newtons_method_2d(&func_to_solve, initial_guess, precision);
 }
 
 #[derive(Clone)]
@@ -277,4 +408,17 @@ mod test {
             assert!((*expected - *actual).abs() < 1e-10);
         }
     }
+
+    #[test]
+    fn maxima_cube() {
+        let func = |x: f64| x * (x - 2.0) * (x + 2.0);
+
+        let actual = newtons_method_maxima(&func, 0.3, 1e-5);
+        let expected = -1.1547;
+
+        println!("expected: {}, actual {}", expected, actual);
+        assert!(float_compare(expected, actual, 1e-3));
+    }
 }
+
+

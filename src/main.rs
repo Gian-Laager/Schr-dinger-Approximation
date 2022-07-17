@@ -16,20 +16,21 @@ use rayon::iter::*;
 use std::f64;
 use std::fs::File;
 use std::io::Write;
+use std::process::Command;
 use tokio;
 use crate::wkb_wave_func::WkbWaveFunction;
 
 const TRAPEZE_PER_THREAD: usize = 1000;
 const INTEG_STEPS: usize = 10000;
 const NUMBER_OF_POINTS: usize = 10000;
-const H_BAR: f64 = 1.0;
-const X_0: f64 = 8.0;
+const H_BAR: f64 = 1.5;
+const X_0: f64 = 6.0;
 const ENERGY: f64 = 20.0;
 const MASS: f64 = 3.0;
 const C_0: f64 = 1.0;
 const THETA: f64 = 0.0;
 
-const VIEW: (f64, f64) = (-8.0, 8.0);
+const VIEW: (f64, f64) = (-4.5, 4.5);
 
 #[derive(Copy, Clone)]
 pub struct Phase {
@@ -40,12 +41,21 @@ pub struct Phase {
 }
 
 impl Phase {
+    fn default() -> Phase {
+        Phase {
+            energy: 0.0,
+            mass: 0.0,
+            potential: |x| 0.0,
+            x_0: 0.0,
+        }
+    }
+
     const fn new(energy: f64, mass: f64, potential: fn(&f64) -> f64, x_0: f64) -> Phase {
         return Phase {
             energy,
             mass,
             potential,
-            x_0
+            x_0,
         };
     }
 }
@@ -59,10 +69,6 @@ impl ReToC for Phase {
             / complex(H_BAR, 0.0);
     }
 }
-
-
-
-
 
 fn square(x: &f64) -> f64 {
     // 5.0 * (x + 1.0) * (x - 1.0) * (x + 2.0) * (x - 2.0) - 1.0
@@ -88,11 +94,10 @@ async fn main() {
     let mut data_str: String = values1
         .par_iter()
         .filter(|p| {
-            (turning_point_boundaries.clone()).map(|ts| ts.iter()
+            (turning_point_boundaries.clone()).iter()
                 .map(order_ts)
                 .map(|(t1, t2)| p.x < t1 || p.x > t2)
-                .fold(true, |a, b| a && b))
-                .unwrap_or(true)
+                .fold(true, |a, b| a && b)
         })
         .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
         .reduce(|| String::new(), |s: String, current: String| s + &*current);
@@ -100,11 +105,10 @@ async fn main() {
     data_str.push_str(&*values2
         .par_iter()
         .filter(|p| {
-            (turning_point_boundaries.clone()).map(|ts| ts.iter()
+            (turning_point_boundaries.clone()).iter()
                 .map(order_ts)
                 .map(|(t1, t2)| p.x < t1 || p.x > t2)
-                .fold(true, |a, b| a && b))
-                .unwrap_or(true)
+                .fold(true, |a, b| a && b)
         })
         .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
         .reduce(|| String::new(), |s: String, current: String| s + &*current));
@@ -137,4 +141,14 @@ async fn main() {
 
     data_file
         .write_all((data_str).as_ref()).unwrap();
+
+    let mut plot_3d_file = File::create("plot_3d.gnuplot").unwrap();
+
+    let plot_3d_cmd = "splot \"data.txt\" i 0 u 1:2:3 t \"WKB\" w l, \"data.txt\" i 1 u 1:2:3 t \"Airy 1\" w l, \"data.txt\" i 2 u 1:2:3 t \"Ariy 2\" w l";
+    plot_3d_file.write_all(plot_3d_cmd.as_ref()).unwrap();
+
+    let mut plot_3d_file = File::create("plot.gnuplot").unwrap();
+
+    let plot_3d_cmd = "plot \"data.txt\" i 0 u 1:2 t \"WKB\", \"data.txt\" i 1 u 1:2 t \"Airy 1\", \"data.txt\" i 2 u 1:2 t \"Ariy 2\"";
+    plot_3d_file.write_all(plot_3d_cmd.as_ref()).unwrap();
 }

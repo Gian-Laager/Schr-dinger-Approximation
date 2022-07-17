@@ -1,10 +1,14 @@
-use crate::newtons_method::{derivative, make_guess, newtons_method_find_new_zero, NewtonsMethodFindNewZero};
+use crate::newtons_method::{derivative, make_guess, newtons_method_find_new_zero, newtons_method_maxima, NewtonsMethodFindNewZero};
 use crate::newtons_method::newtons_method;
 use crate::newtons_method::newtons_method_max_iters;
 use crate::*;
 use num::signum;
 use std::cmp::Ordering;
+use num::integer::sqrt;
 use crate::utils::cmp_f64;
+
+const MAX_TURNING_POINTS: usize = 256;
+const ACCURACY: f64 = 1e-9;
 
 fn Ai(x: Complex64) -> Complex64 {
     let go_return;
@@ -21,34 +25,20 @@ fn Bi(x: Complex64) -> Complex64 {
 
 #[derive(Debug)]
 pub struct TGroup {
-    pub t0: Option<f64>,
-    pub ts: Option<Vec<(f64, f64)>>,
-    pub tn: Option<f64>,
+    // pub t0: Option<f64>,
+    pub ts: Vec<(f64, f64)>,
+    // pub tn: Option<f64>,
 }
 
 impl TGroup {
     pub fn new() -> TGroup {
         TGroup {
-            t0: None,
-            ts: None,
-            tn: None,
+            ts: vec![],
         }
     }
 
     pub fn add_ts(&mut self, new_t: (f64, f64)) {
-        if let Some(existing_ts) = &mut self.ts {
-            existing_ts.push(new_t);
-        } else {
-            self.ts = Some(vec![new_t]);
-        }
-    }
-
-    pub fn set_t0(&mut self, t: f64) {
-        self.t0 = Some(t);
-    }
-
-    pub fn set_tn(&mut self, t: f64) {
-        self.tn = Some(t);
+        self.ts.push(new_t);
     }
 }
 
@@ -125,10 +115,12 @@ impl AiryWaveFunction {
 
     fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
         let mut zeros = zeros.clone();
+        let valid = validity_func(phase.clone());
+
         zeros.sort_by(cmp_f64);
         let mut derivatives = zeros
             .iter()
-            .map(|x| derivative(&validity_func(phase.clone()), *x))
+            .map(|x| derivative(&valid, *x))
             .map(signum)
             .collect::<Vec<f64>>();
 
@@ -137,15 +129,29 @@ impl AiryWaveFunction {
         if let Some(first) = derivatives.get(0) {
             if derivatives.get(1).is_some() {
                 if *first == -1.0 {
-                    result.set_t0(zeros[0]);
+                    let maxima = newtons_method_maxima(&valid, zeros[0], ACCURACY);
+
+                    let mut guess = maxima;
+                    while valid(guess) / derivative(&valid, guess) < ACCURACY.sqrt() {
+                        guess -= ACCURACY;
+                    }
+
+                    let t = newtons_method(&valid, guess, ACCURACY);
+                    result.add_ts((t, zeros[0]));
                     derivatives.remove(0);
                 }
             }
         }
 
         if derivatives.len() % 2 != 0 {
-            result.set_tn(zeros[zeros.len() - 1]);
-            zeros.remove(zeros.len() - 1);
+            let maxima = newtons_method_maxima(&valid, zeros[zeros.len() - 1], ACCURACY);
+            let mut guess = maxima;
+            while valid(guess) / derivative(&valid, guess) > -ACCURACY.sqrt() {
+                guess += ACCURACY;
+            }
+
+            let t = newtons_method(&valid, guess, ACCURACY);
+            result.add_ts((zeros[zeros.len() - 1], t));
             derivatives.remove(derivatives.len() - 1);
         }
 
@@ -158,9 +164,7 @@ impl AiryWaveFunction {
         return result;
     }
 
-    pub fn calc_ts(phase: &Phase, view: (f64, f64)) -> TGroup {
-        const MAX_TURNING_POINTS: usize = 256;
-        const ACCURACY: f64 = 1e-7;
+    fn find_zeros(phase: &Phase, view: (f64, f64)) -> Vec<f64> {
         let mut zeros = NewtonsMethodFindNewZero::new(
             validity_func(phase.clone()),
             ACCURACY,
@@ -177,16 +181,22 @@ impl AiryWaveFunction {
             });
 
         let view = if view.0 < view.1 { view } else { (view.1, view.0) };
-        let mut unique_zeros = zeros.get_previous_zeros().iter().filter(|x| **x > view.0 && **x < view.1).map(|x| *x).collect::<Vec<f64>>();
+        let unique_zeros = zeros.get_previous_zeros().iter()
+            .filter(|x| **x > view.0 && **x < view.1).map(|x| *x)
+            .collect::<Vec<f64>>();
+        return unique_zeros;
+    }
 
-        return Self::group_ts(&unique_zeros, phase);
+    pub fn calc_ts(phase: &Phase, view: (f64, f64)) -> TGroup {
+        let zeros = Self::find_zeros(phase, view);
+        return Self::group_ts(&zeros, phase);
     }
 
     pub fn new(wave_func: &WkbWaveFunction, view: (f64, f64)) -> Vec<AiryWaveFunction> {
         let phase = wave_func.phase;
         let turning_point_boundaries = AiryWaveFunction::calc_ts(phase, view);
 
-        turning_point_boundaries.ts.map(|ts| ts.iter().map(|(t1, t2)| {
+        turning_point_boundaries.ts.iter().map(|(t1, t2)| {
             let x_1 = newtons_method(&|x| (phase.potential)(&x) - phase.energy, (*t1 + *t2) / 2.0, 1e-7);
             let u_1 = 2.0 * phase.mass / (H_BAR * H_BAR) * derivative(&|x| (phase.potential)(&x), x_1);
             let (c_a, c_b) = AiryWaveFunction::calc_c_a_and_c_b(
@@ -204,7 +214,7 @@ impl AiryWaveFunction {
                 x_1,
                 ts: (*t1, *t2),
             }
-        }).collect()).unwrap_or(vec![])
+        }).collect()
     }
 }
 
