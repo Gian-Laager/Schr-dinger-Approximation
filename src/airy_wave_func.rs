@@ -1,4 +1,4 @@
-use crate::newtons_method::{derivative, make_guess, newtons_method_find_new_zero, newtons_method_maxima, NewtonsMethodFindNewZero};
+use crate::newtons_method::{derivative, make_guess, newtons_method_find_new_zero, NewtonsMethodFindNewZero, regula_falsi_bisection, regula_falsi_method};
 use crate::newtons_method::newtons_method;
 use crate::newtons_method::newtons_method_max_iters;
 use crate::*;
@@ -127,30 +127,15 @@ impl AiryWaveFunction {
         let mut result = TGroup::new();
 
         if let Some(first) = derivatives.get(0) {
-            if derivatives.get(1).is_some() {
-                if *first == -1.0 {
-                    let maxima = newtons_method_maxima(&valid, zeros[0], ACCURACY);
-
-                    let mut guess = maxima;
-                    while valid(guess) / derivative(&valid, guess) < ACCURACY.sqrt() {
-                        guess -= ACCURACY;
-                    }
-
-                    let t = newtons_method(&valid, guess, ACCURACY);
-                    result.add_ts((t, zeros[0]));
-                    derivatives.remove(0);
-                }
+            if derivatives.len() % 2 != 0 {
+                let t = regula_falsi_bisection(&valid, zeros[0] - ACCURACY.sqrt(), -ACCURACY.sqrt(), ACCURACY);
+                result.add_ts((zeros[zeros.len() - 1], t));
+                derivatives.remove(derivatives.len() - 1);
             }
         }
 
         if derivatives.len() % 2 != 0 {
-            let maxima = newtons_method_maxima(&valid, zeros[zeros.len() - 1], ACCURACY);
-            let mut guess = maxima;
-            while valid(guess) / derivative(&valid, guess) > -ACCURACY.sqrt() {
-                guess += ACCURACY;
-            }
-
-            let t = newtons_method(&valid, guess, ACCURACY);
+            let t = regula_falsi_bisection(&valid, zeros[zeros.len() - 1] + ACCURACY.sqrt(), ACCURACY.sqrt(), ACCURACY);
             result.add_ts((zeros[zeros.len() - 1], t));
             derivatives.remove(derivatives.len() - 1);
         }

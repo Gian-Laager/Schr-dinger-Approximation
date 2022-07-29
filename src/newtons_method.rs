@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt::Debug;
-use num::Float;
+use num::{Float, signum};
 use std::ops::*;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -134,7 +134,8 @@ pub fn newtons_method_2d<F>(f: &F, mut guess: f64, precision: f64) -> f64
         if step.abs() < precision {
             return guess;
         } else {
-            guess -= step;;
+            guess -= step;
+            ;
         }
     }
 }
@@ -171,14 +172,46 @@ fn smooth_sgn(x: f64) -> f64 {
     }
 }
 
-pub fn newtons_method_maxima<F>(f: &F, initial_guess: f64, precision: f64) -> f64 where F: Fn(f64) -> f64 {
-    let f_deriv = |x| derivative(f, x);
-    let func_to_solve = |x| Vec2{
-        x: f_deriv(x),
-        y: smooth_sgn(derivative(&f_deriv, x))
-    };
+fn check_sign(initial: f64, new: f64) -> bool {
+    if initial == new {
+        return false;
+    }
+    return (initial <= -0.0 && new >= 0.0) || (initial >= 0.0 && new <= 0.0);
+}
 
-    return newtons_method_2d(&func_to_solve, initial_guess, precision);
+pub fn bisection_search_sign_change<F>(f: &F, initial_guess: f64, step: f64) -> f64 where F: Fn(f64) -> f64 {
+    let mut result = initial_guess;
+    while !check_sign(f(initial_guess), f(result)) {
+        result += step
+    }
+    return result;
+}
+
+
+fn regula_falsi_c<F>(f: &F, a: f64, b: f64) -> f64 where F: Fn(f64) -> f64 {
+    return (a * f(b) - b * f(a)) / (f(b) - f(a));
+}
+
+pub fn regula_falsi_method<F>(f: &F, mut a: f64, mut b: f64, precision: f64) -> f64 where F: Fn(f64) -> f64 {
+    if a > b {
+        let temp = a;
+        a = b;
+        b = temp;
+    }
+
+    let mut c = regula_falsi_c(f, a, b);
+    while f64::abs(f(c)) > precision {
+        b = regula_falsi_c(f, a, b);
+        a = regula_falsi_c(f, a, b);
+        c = regula_falsi_c(f, a, b);
+    }
+    return c;
+}
+
+pub fn regula_falsi_bisection<F>(f: &F, guess: f64, bisection_step: f64, precision: f64) -> f64 where F: Fn(f64) -> f64 {
+    let a = guess;
+    let b = bisection_search_sign_change(f, guess, bisection_step);
+    return regula_falsi_method(f, a, b, precision);
 }
 
 #[derive(Clone)]
@@ -410,11 +443,11 @@ mod test {
     }
 
     #[test]
-    fn maxima_cube() {
+    fn regula_falsi_bisection_test() {
         let func = |x: f64| x * (x - 2.0) * (x + 2.0);
 
-        let actual = newtons_method_maxima(&func, 0.3, 1e-5);
-        let expected = -1.1547;
+        let actual = regula_falsi_bisection(&func, -1e-3, -1e-3, 1e-5);
+        let expected = -2.0;
 
         println!("expected: {}, actual {}", expected, actual);
         assert!(float_compare(expected, actual, 1e-3));
