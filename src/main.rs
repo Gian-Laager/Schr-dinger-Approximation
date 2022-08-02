@@ -61,7 +61,7 @@ impl Phase {
         }
     }
 
-    const fn new(energy: f64, mass: f64, potential: fn(&f64) -> f64, x_0: f64) -> Phase {
+    fn new(energy: f64, mass: f64, potential: fn(&f64) -> f64, x_0: f64) -> Phase {
         return Phase {
             energy,
             mass,

@@ -93,7 +93,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_square() {
-        static SQUARE_FUNC: Function = Function::new(square);
+        let square_func: Function = Function::new(square);
         for i in 0..100 {
             for j in 0..10 {
                 let a = f64::from(i - 50) / 12.3;
@@ -102,7 +102,7 @@ mod test {
                 if i == j {
                     assert_eq!(
                         integrate(
-                            evaluate_function_between(&SQUARE_FUNC, a, b, INTEG_STEPS),
+                            evaluate_function_between(&square_func, a, b, INTEG_STEPS),
                             TRAPEZE_PER_THREAD,
                         ),
                         complex(0.0, 0.0)
@@ -113,7 +113,7 @@ mod test {
                 let epsilon = 0.00001;
                 assert!(float_compare(
                     integrate(
-                        evaluate_function_between(&SQUARE_FUNC, a, b, INTEG_STEPS),
+                        evaluate_function_between(&square_func, a, b, INTEG_STEPS),
                         TRAPEZE_PER_THREAD,
                     ),
                     square_itegral(a, b),
@@ -125,8 +125,8 @@ mod test {
 
     #[test]
     fn evaluate_square_func_between() {
-        static SQUARE_FUNC: Function = Function::new(square);
-        let actual = evaluate_function_between(&SQUARE_FUNC, -2.0, 2.0, 5);
+        let square_func: Function = Function::new(square);
+        let actual = evaluate_function_between(&square_func, -2.0, 2.0, 5);
         let expected = vec![
             Point {
                 x: -2.0,
@@ -167,7 +167,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_sinusoidal_exp() {
-        static SINUSOIDAL_EXP_COMPLEX: Function = Function::new(sinusoidal_exp_complex);
+        let SINUSOIDAL_EXP_COMPLEX: Function = Function::new(sinusoidal_exp_complex);
         for i in 0..10 {
             for j in 0..10 {
                 let a = f64::from(i - 50) / 12.3;
