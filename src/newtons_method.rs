@@ -179,12 +179,12 @@ fn check_sign(initial: f64, new: f64) -> bool {
     return (initial <= -0.0 && new >= 0.0) || (initial >= 0.0 && new <= 0.0);
 }
 
-pub fn bisection_search_sign_change<F>(f: &F, initial_guess: f64, step: f64) -> f64 where F: Fn(f64) -> f64 {
+pub fn bisection_search_sign_change<F>(f: &F, initial_guess: f64, step: f64) -> (f64, f64) where F: Fn(f64) -> f64 {
     let mut result = initial_guess;
     while !check_sign(f(initial_guess), f(result)) {
         result += step
     }
-    return result;
+    return (result-step, result);
 }
 
 
@@ -209,8 +209,7 @@ pub fn regula_falsi_method<F>(f: &F, mut a: f64, mut b: f64, precision: f64) -> 
 }
 
 pub fn regula_falsi_bisection<F>(f: &F, guess: f64, bisection_step: f64, precision: f64) -> f64 where F: Fn(f64) -> f64 {
-    let a = guess;
-    let b = bisection_search_sign_change(f, guess, bisection_step);
+    let (a, b) = bisection_search_sign_change(f, guess, bisection_step);
     return regula_falsi_method(f, a, b, precision);
 }
 
@@ -272,7 +271,7 @@ pub fn make_guess<F>(f: &F, (start, end): (f64, f64), n: usize) -> Option<f64>
     let sort_func = |(_, y1): &(f64, f64), (_, y2): &(f64, f64)| -> Ordering { cmp_f64(&y1, &y2) };
     let mut points: Vec<(f64, f64)> = (0..n).into_iter()
         .map(|i| index_to_range(i as f64, 0.0, n as f64, start, end))
-        .map(|x| {
+        .map(move |x| {
             let der = derivative(f, x);
             (x, f(x) / (-(-der * der).exp() + 1.0))
         })

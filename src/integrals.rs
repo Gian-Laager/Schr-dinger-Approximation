@@ -8,7 +8,7 @@ pub trait ReToC: Sync {
 }
 
 pub struct Function {
-    f: fn(f64) -> Complex64,
+    pub(crate) f: fn(f64) -> Complex64,
 }
 
 impl Function {

@@ -1,3 +1,6 @@
+#![feature(fn_traits)]
+#![feature(unboxed_closures)]
+
 mod airy;
 mod utils;
 mod airy_wave_func;
@@ -14,23 +17,31 @@ use num::complex::Complex64;
 use num::pow::Pow;
 use rayon::iter::*;
 use std::f64;
+use std::f64::consts::PI;
 use std::fs::File;
 use std::io::Write;
 use std::process::Command;
 use tokio;
 use crate::wkb_wave_func::WkbWaveFunction;
 
+fn nth_energy_square(n: usize) -> f64 {
+    H_BAR * (2.0 * n as f64 + 1.0) * 2.0_f64.sqrt() / (2.0 * MASS.sqrt())
+}
+
 const TRAPEZE_PER_THREAD: usize = 1000;
 const INTEG_STEPS: usize = 10000;
-const NUMBER_OF_POINTS: usize = 10000;
+const NUMBER_OF_POINTS: usize = 100000;
 const H_BAR: f64 = 1.5;
-const X_0: f64 = 6.0;
-const ENERGY: f64 = 20.0;
-const MASS: f64 = 3.0;
-const C_0: f64 = 1.0;
-const THETA: f64 = 0.0;
+const X_0: f64 = 10.0;
 
-const VIEW: (f64, f64) = (-4.5, 4.5);
+fn ENERGY() -> f64 { nth_energy_square(20) }
+
+const MASS: f64 = 3.0;
+const C_0: f64 = 5e-31;
+const THETA: f64 = 0.0;
+const AIRY_EXTRA: f64 = 0.4;
+
+const VIEW: (f64, f64) = (-6.0, 6.0);
 
 #[derive(Copy, Clone)]
 pub struct Phase {
@@ -81,13 +92,19 @@ fn order_ts((t1, t2): &(f64, f64)) -> (f64, f64) {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    let phase1: Phase = Phase::new(ENERGY, MASS, square, -X_0);
+    let phase1: Phase = Phase::new(ENERGY(), MASS, square, -X_0);
     let wave_func1 = WkbWaveFunction::new(&phase1, C_0, THETA, INTEG_STEPS);
     let values1 = evaluate_function_between(&wave_func1, VIEW.0, 0.0, NUMBER_OF_POINTS);
-    let phase2: Phase = Phase::new(ENERGY, MASS, square, X_0);
+    let (airy_wave_func1, mut boundaries1) = AiryWaveFunction::new(&wave_func1, (VIEW.0, 0.0));
+
+    let phase2: Phase = Phase::new(ENERGY(), MASS, square, X_0);
     let wave_func2 = WkbWaveFunction::new(&phase2, C_0, THETA, INTEG_STEPS);
+    let (airy_wave_func2, mut boundaries2) = AiryWaveFunction::new(&wave_func2, (0.0, VIEW.1));
     let values2 = evaluate_function_between(&wave_func2, 0.0, VIEW.1, NUMBER_OF_POINTS);
-    let turning_point_boundaries = &AiryWaveFunction::calc_ts(&phase1, VIEW).ts;
+    let mut turning_point_boundaries = vec![];
+    turning_point_boundaries.append(&mut boundaries1.ts);
+    turning_point_boundaries.append(&mut boundaries2.ts);
+
 
     let mut data_file = File::create("data.txt").unwrap();
 
@@ -113,10 +130,10 @@ async fn main() {
         .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
         .reduce(|| String::new(), |s: String, current: String| s + &*current));
 
-    let airy_wave_funcs = AiryWaveFunction::new(&wave_func1, (VIEW.0, 0.0));
 
+    let airy_wave_funcs = airy_wave_func1;
     let airy_data_str = airy_wave_funcs.iter().map(|airy_wave_func| {
-        let airy_values = evaluate_function_between(airy_wave_func, airy_wave_func.ts.0, airy_wave_func.ts.1, NUMBER_OF_POINTS);
+        let airy_values = evaluate_function_between(airy_wave_func, airy_wave_func.ts.0 - AIRY_EXTRA, airy_wave_func.ts.1 + AIRY_EXTRA, NUMBER_OF_POINTS);
 
         airy_values
             .par_iter()
@@ -126,10 +143,10 @@ async fn main() {
         .fold(String::new(), |s: String, current: String| s + "\n\n" + &*current);
     data_str.push_str(&*airy_data_str);
 
-    let airy_wave_funcs = AiryWaveFunction::new(&wave_func2, (0.0, VIEW.1));
+    let airy_wave_funcs = airy_wave_func2;
 
     let airy_data_str = airy_wave_funcs.iter().map(|airy_wave_func| {
-        let airy_values = evaluate_function_between(airy_wave_func, airy_wave_func.ts.0, airy_wave_func.ts.1, NUMBER_OF_POINTS);
+        let airy_values = evaluate_function_between(airy_wave_func, airy_wave_func.ts.0 - AIRY_EXTRA, airy_wave_func.ts.1 + AIRY_EXTRA, NUMBER_OF_POINTS);
 
         airy_values
             .par_iter()
@@ -139,8 +156,18 @@ async fn main() {
         .fold(String::new(), |s: String, current: String| s + "\n\n" + &*current);
     data_str.push_str(&*airy_data_str);
 
+    let pot_re_to_c = Function { f: |x| complex(square(&x), 0.0) };
+    let potential = evaluate_function_between(&pot_re_to_c, VIEW.0, VIEW.1, NUMBER_OF_POINTS);
+
+    let pot_str = potential
+        .par_iter()
+        .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
+        .reduce(|| String::new(), |s: String, current: String| s + &*current);
+    data_str.push_str("\n\n");
+    data_str.push_str(&*pot_str);
     data_file
         .write_all((data_str).as_ref()).unwrap();
+
 
     let mut plot_3d_file = File::create("plot_3d.gnuplot").unwrap();
 
