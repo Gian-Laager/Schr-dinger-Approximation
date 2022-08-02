@@ -129,7 +129,7 @@ impl AiryWaveFunction {
         println!("wkb_a: {}, wkb_b: {},  c_a: {}, c_b: {}", c_wkb.0, c_wkb.1, (c_airy1 + c_airy2) / 2.0, c_b);
         println!("airy_ai_1: {}, airy_bi_1: {},  airy_ai_2: {}, airy_bi_2: {}", airy_ai_1, airy_bi_1, airy_ai_2, airy_bi_2);
 
-        return ((c_airy1 + c_airy2) / 2.0, complex(0.0, 0.0))
+        return (c_a, c_b)
     }
 
     fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {

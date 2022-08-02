@@ -1,4 +1,3 @@
-#![feature(fn_traits)]
 #![feature(unboxed_closures)]
 
 mod airy;
