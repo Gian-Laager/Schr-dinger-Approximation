@@ -1,51 +1,85 @@
-use rayon::prelude::*;
-use crate::Complex64;
 use crate::utils::*;
+use crate::Complex64;
 use crate::*;
+use rayon::prelude::*;
 
-pub trait ReToC: Sync {
-    fn eval(&self, x: &f64) -> Complex64;
+pub trait Func<A, R>: Sync {
+    fn eval(&self, x: A) -> R;
 }
 
-pub struct Function {
-    pub(crate) f: fn(f64) -> Complex64,
+pub trait ReToC: Sync + Func<f64, Complex64> {}
+
+pub trait ReToRe: Sync + Func<f64, f64> {}
+
+pub struct Function<A, R> {
+    pub(crate) f: fn(A) -> R,
 }
 
-impl Function {
-    pub const fn new(f: fn(f64) -> Complex64) -> Function {
+impl<A, R> Function<A, R> {
+    pub const fn new(f: fn(A) -> R) -> Function<A, R> {
         return Function { f };
     }
 }
 
-impl ReToC for Function {
-    fn eval(&self, x: &f64) -> Complex64 {
-        (self.f)(*x)
+impl Func<f64, Complex64> for Function<f64, Complex64> {
+    fn eval(&self, x: f64) -> Complex64 {
+        (self.f)(x)
     }
 }
-pub struct Point {
-    pub x: f64,
-    pub y: Complex64,
+pub struct Point<T_X, T_Y> {
+    pub x: T_X,
+    pub y: T_Y,
 }
 
-pub fn trapezoidal_approx(start: &Point, end: &Point) -> Complex64 {
-    return complex(end.x - start.x, 0.0) * (start.y + end.y) / complex(2.0, 0.0);
+pub fn trapezoidal_approx<X, Y>(start: &Point<X, Y>, end: &Point<X, Y>) -> Y
+where
+    X: std::ops::Sub<Output = X> + Copy,
+    Y: std::ops::Add<Output = Y>
+        + std::ops::Mul<Output = Y>
+        + std::ops::Div<f64, Output = Y>
+        + Copy
+        + From<X>,
+{
+    return Y::from(end.x - start.x) * (start.y + end.y) / 2.0_f64;
 }
 
-pub fn index_to_range(x: f64, in_min: f64, in_max: f64, out_min: f64, out_max: f64) -> f64 {
+pub fn index_to_range<T>(x: T, in_min: T, in_max: T, out_min: T, out_max: T) -> T
+where
+    T: Copy
+        + std::ops::Sub<Output = T>
+        + std::ops::Mul<Output = T>
+        + std::ops::Div<Output = T>
+        + std::ops::Add<Output = T>,
+{
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-pub fn integrate(points: Vec<Point>, batch_size: usize) -> Complex64 {
+pub fn integrate<
+    X: Sync + std::ops::Add<Output = X> + std::ops::Sub<Output = X> + Copy,
+    Y: Default
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::Div<f64, Output = Y>
+        + std::ops::Mul<Output = Y>
+        + std::ops::Add<Output = Y>
+        + Send
+        + std::iter::Sum<Y>
+        + Copy
+        + From<X>,
+>(
+    points: Vec<Point<X, Y>>,
+    batch_size: usize,
+) -> Y {
     if points.len() < 2 {
-        return complex(0.0, 0.0);
+        return Y::default();
     }
 
-    let batches: Vec<&[Point]> = points.chunks(batch_size).collect();
+    let batches: Vec<&[Point<X, Y>]> = points.chunks(batch_size).collect();
 
-    let parallel: Complex64 = batches
+    let parallel: Y = batches
         .par_iter()
         .map(|batch| {
-            let mut sum = complex(0.0, 0.0);
+            let mut sum = Y::default();
             for i in 0..(batch.len() - 1) {
                 sum += trapezoidal_approx(&batch[i], &batch[i + 1]);
             }
@@ -53,7 +87,7 @@ pub fn integrate(points: Vec<Point>, batch_size: usize) -> Complex64 {
         })
         .sum();
 
-    let mut rest = complex(0.0, 0.0);
+    let mut rest = Y::default();
 
     for i in 0..batches.len() - 1 {
         rest += trapezoidal_approx(&batches[i][batches[i].len() - 1], &batches[i + 1][0]);
@@ -62,15 +96,35 @@ pub fn integrate(points: Vec<Point>, batch_size: usize) -> Complex64 {
     return parallel + rest;
 }
 
-pub fn evaluate_function_between(f: &dyn ReToC, a: f64, b: f64, n: usize) -> Vec<Point> {
+pub fn evaluate_function_between<X, Y>(f: &dyn Func<X, Y>, a: X, b: X, n: usize) -> Vec<Point<X, Y>>
+where
+    X: Copy
+        + Send
+        + Sync
+        + std::cmp::PartialEq
+        + From<f64>
+        + std::ops::Add<Output = X>
+        + std::ops::Sub<Output = X>
+        + std::ops::Mul<Output = X>
+        + std::ops::Div<Output = X>,
+    Y: Send + Sync,
+{
     if a == b {
         return vec![];
     }
 
     (0..n)
         .into_par_iter()
-        .map(|i| index_to_range(i as f64, 0.0, n as f64 - 1.0, a, b))
-        .map(|x| Point { x, y: f.eval(&x) })
+        .map(|i| {
+            index_to_range(
+                X::from(i as f64),
+                X::from(0.0_f64),
+                X::from((n - 1) as f64),
+                a,
+                b,
+            )
+        })
+        .map(|x: X| Point { x, y: f.eval(x) })
         .collect()
 }
 
@@ -93,7 +147,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_square() {
-        let square_func: Function = Function::new(square);
+        let square_func: Function<f64, Complex64> = Function::new(square);
         for i in 0..100 {
             for j in 0..10 {
                 let a = f64::from(i - 50) / 12.3;
@@ -125,7 +179,7 @@ mod test {
 
     #[test]
     fn evaluate_square_func_between() {
-        let square_func: Function = Function::new(square);
+        let square_func: Function<f64, Complex64> = Function::new(square);
         let actual = evaluate_function_between(&square_func, -2.0, 2.0, 5);
         let expected = vec![
             Point {
@@ -167,7 +221,8 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_sinusoidal_exp() {
-        let SINUSOIDAL_EXP_COMPLEX: Function = Function::new(sinusoidal_exp_complex);
+        let SINUSOIDAL_EXP_COMPLEX: Function<f64, Complex64> =
+            Function::new(sinusoidal_exp_complex);
         for i in 0..10 {
             for j in 0..10 {
                 let a = f64::from(i - 50) / 12.3;

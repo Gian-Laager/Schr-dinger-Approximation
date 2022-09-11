@@ -1,0 +1,1 @@
+plot "data.txt" i 0 u 1:2 t "WKB", "data.txt" i 1 u 1:2 t "Airy 1", "data.txt" i 2 u 1:2 t "Ariy 2"

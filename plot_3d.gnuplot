@@ -1,0 +1,1 @@
+splot "data.txt" i 0 u 1:2:3 t "WKB" w l, "data.txt" i 1 u 1:2:3 t "Airy 1" w l, "data.txt" i 2 u 1:2:3 t "Ariy 2" w l

@@ -7,6 +7,7 @@ mod newtons_method;
 mod integrals;
 mod wave_function_builder;
 mod wkb_wave_func;
+mod turning_points;
 
 use crate::airy::airy_ai;
 use crate::airy_wave_func::AiryWaveFunction;
@@ -30,7 +31,7 @@ fn nth_energy_square(n: usize) -> f64 {
 const TRAPEZE_PER_THREAD: usize = 1000;
 const INTEG_STEPS: usize = 10000;
 const NUMBER_OF_POINTS: usize = 100000;
-const H_BAR: f64 = 1.5;
+const H_BAR: f64 = 1.0;
 const X_0: f64 = 10.0;
 
 fn ENERGY() -> f64 { nth_energy_square(20) }
@@ -38,7 +39,7 @@ fn ENERGY() -> f64 { nth_energy_square(20) }
 const MASS: f64 = 3.0;
 const C_0: f64 = 5e-31;
 const THETA: f64 = 0.0;
-const AIRY_EXTRA: f64 = 0.4;
+const AIRY_EXTRA: f64 = 0.0;
 
 const VIEW: (f64, f64) = (-6.0, 6.0);
 
@@ -46,7 +47,7 @@ const VIEW: (f64, f64) = (-6.0, 6.0);
 pub struct Phase {
     energy: f64,
     mass: f64,
-    potential: fn(&f64) -> f64,
+    potential: fn(f64) -> f64,
     x_0: f64,
 }
 
@@ -55,12 +56,12 @@ impl Phase {
         Phase {
             energy: 0.0,
             mass: 0.0,
-            potential: |x| 0.0,
+            potential: |_x| 0.0,
             x_0: 0.0,
         }
     }
 
-    fn new(energy: f64, mass: f64, potential: fn(&f64) -> f64, x_0: f64) -> Phase {
+    fn new(energy: f64, mass: f64, potential: fn(f64) -> f64, x_0: f64) -> Phase {
         return Phase {
             energy,
             mass,
@@ -68,38 +69,40 @@ impl Phase {
             x_0,
         };
     }
-}
 
-impl ReToC for Phase {
-    fn eval(&self, x: &f64) -> Complex64 {
-        return (complex(2.0, 0.0)
-            * complex(self.mass, 0.0)
-            * complex((self.potential)(x) - self.energy, 0.0))
-            .sqrt()
-            / complex(H_BAR, 0.0);
+    fn momentum(self, x: f64) -> f64 {
+        self.eval(x).sqrt()
     }
 }
 
-fn square(x: &f64) -> f64 {
+impl Func<f64, f64> for Phase {
+    fn eval(&self, x: f64) -> f64 {
+        return (2.0 * self.mass / H_BAR) * ((self.potential)(x) - self.energy).sqrt();
+    }
+}
+
+fn square(x: f64) -> f64 {
     // 5.0 * (x + 1.0) * (x - 1.0) * (x + 2.0) * (x - 2.0) - 1.0
     x * x
+    // (x-4.5)*(x-1.5)*(x+1.5)*(x+4.5)/4.0 + 20.0
 }
 
 fn order_ts((t1, t2): &(f64, f64)) -> (f64, f64) {
     return if t1 > t2 { (*t2, *t1) } else { (*t1, *t2) };
 }
 
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main(flavor="multi_thread")]
 async fn main() {
+    println!("Energy: {}", ENERGY());
     let phase1: Phase = Phase::new(ENERGY(), MASS, square, -X_0);
-    let wave_func1 = WkbWaveFunction::new(&phase1, C_0, THETA, INTEG_STEPS);
-    let values1 = evaluate_function_between(&wave_func1, VIEW.0, 0.0, NUMBER_OF_POINTS);
-    let (airy_wave_func1, mut boundaries1) = AiryWaveFunction::new(&wave_func1, (VIEW.0, 0.0));
+    let (airy_wave_func1, mut boundaries1) = AiryWaveFunction::new(&phase1, (VIEW.0 / 2.0, 0.0));
+    let wave_func1 = WkbWaveFunction::new(&phase1, C_0, THETA, INTEG_STEPS, boundaries1.ts[0].0);
+    let values1 = evaluate_function_between(&wave_func1, VIEW.0 / 2.0, 0.0, NUMBER_OF_POINTS);
 
     let phase2: Phase = Phase::new(ENERGY(), MASS, square, X_0);
-    let wave_func2 = WkbWaveFunction::new(&phase2, C_0, THETA, INTEG_STEPS);
-    let (airy_wave_func2, mut boundaries2) = AiryWaveFunction::new(&wave_func2, (0.0, VIEW.1));
-    let values2 = evaluate_function_between(&wave_func2, 0.0, VIEW.1, NUMBER_OF_POINTS);
+    let (airy_wave_func2, mut boundaries2) = AiryWaveFunction::new(&phase2, (0.0, VIEW.1 / 2.0));
+    let wave_func2 = WkbWaveFunction::new(&phase2, C_0, THETA, INTEG_STEPS, boundaries2.ts.last().unwrap().0);
+    let values2 = evaluate_function_between(&wave_func2, 0.0, VIEW.1 / 2.0, NUMBER_OF_POINTS);
     let mut turning_point_boundaries = vec![];
     turning_point_boundaries.append(&mut boundaries1.ts);
     turning_point_boundaries.append(&mut boundaries2.ts);
@@ -115,7 +118,7 @@ async fn main() {
                 .map(|(t1, t2)| p.x < t1 || p.x > t2)
                 .fold(true, |a, b| a && b)
         })
-        .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
+        .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
         .reduce(|| String::new(), |s: String, current: String| s + &*current);
 
     data_str.push_str(&*values2
@@ -126,7 +129,7 @@ async fn main() {
                 .map(|(t1, t2)| p.x < t1 || p.x > t2)
                 .fold(true, |a, b| a && b)
         })
-        .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
+        .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
         .reduce(|| String::new(), |s: String, current: String| s + &*current));
 
 
@@ -155,7 +158,7 @@ async fn main() {
         .fold(String::new(), |s: String, current: String| s + "\n\n" + &*current);
     data_str.push_str(&*airy_data_str);
 
-    let pot_re_to_c = Function { f: |x| complex(square(&x), 0.0) };
+    let pot_re_to_c = Function { f: |x| complex(square(x), 0.0) };
     let potential = evaluate_function_between(&pot_re_to_c, VIEW.0, VIEW.1, NUMBER_OF_POINTS);
 
     let pot_str = potential
