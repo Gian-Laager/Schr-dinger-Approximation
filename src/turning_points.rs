@@ -7,8 +7,7 @@ const MAX_TURNING_POINTS: usize = 256;
 const ACCURACY: f64 = 1e-9;
 
 pub struct TGroup {
-    // pub t0: Option<f64>,
-    pub ts: Vec<(f64, f64)>,
+    pub ts: Vec<((f64, f64),  f64)>,
     // pub tn: Option<f64>,
 }
 
@@ -17,7 +16,7 @@ impl TGroup {
         TGroup { ts: vec![] }
     }
 
-    pub fn add_ts(&mut self, new_t: (f64, f64)) {
+    pub fn add_ts(&mut self, new_t: ((f64, f64), f64)) {
         self.ts.push(new_t);
     }
 }
@@ -83,7 +82,7 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
         assert!(t1_deriv > 0.0);
         assert!(t2_deriv < 0.0);
 
-        groups.add_ts((t1, t2));
+        groups.add_ts(((t1, t2), (t1 + t2) / 2.0));
     }
 
     println!("{:?}", groups.ts);

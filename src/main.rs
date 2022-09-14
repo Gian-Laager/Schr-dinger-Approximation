@@ -32,14 +32,13 @@ const TRAPEZE_PER_THREAD: usize = 1000;
 const INTEG_STEPS: usize = 10000;
 const NUMBER_OF_POINTS: usize = 100000;
 const H_BAR: f64 = 1.0;
-const X_0: f64 = 10.0;
 
 fn ENERGY() -> f64 { nth_energy_square(20) }
 
 const MASS: f64 = 3.0;
-const C_0: f64 = 5e-31;
-const THETA: f64 = 0.0;
-const AIRY_EXTRA: f64 = 0.0;
+const C_0: f64 = 1.0;
+const _THETA: f64 = 0.0;
+const AIRY_EXTRA: f64 = 1.0;
 
 const VIEW: (f64, f64) = (-6.0, 6.0);
 
@@ -48,7 +47,6 @@ pub struct Phase {
     energy: f64,
     mass: f64,
     potential: fn(f64) -> f64,
-    x_0: f64,
 }
 
 impl Phase {
@@ -57,16 +55,14 @@ impl Phase {
             energy: 0.0,
             mass: 0.0,
             potential: |_x| 0.0,
-            x_0: 0.0,
         }
     }
 
-    fn new(energy: f64, mass: f64, potential: fn(f64) -> f64, x_0: f64) -> Phase {
+    fn new(energy: f64, mass: f64, potential: fn(f64) -> f64) -> Phase {
         return Phase {
             energy,
             mass,
             potential,
-            x_0,
         };
     }
 
@@ -77,7 +73,7 @@ impl Phase {
 
 impl Func<f64, f64> for Phase {
     fn eval(&self, x: f64) -> f64 {
-        return (2.0 * self.mass / H_BAR) * ((self.potential)(x) - self.energy).sqrt();
+        return (2.0 * self.mass / H_BAR) * ((self.potential)(x) - self.energy).abs().sqrt();
     }
 }
 
@@ -87,22 +83,21 @@ fn square(x: f64) -> f64 {
     // (x-4.5)*(x-1.5)*(x+1.5)*(x+4.5)/4.0 + 20.0
 }
 
-fn order_ts((t1, t2): &(f64, f64)) -> (f64, f64) {
+fn order_ts(((t1, t2), _): &((f64, f64), f64)) -> (f64, f64) {
     return if t1 > t2 { (*t2, *t1) } else { (*t1, *t2) };
 }
 
 #[tokio::main(flavor="multi_thread")]
 async fn main() {
     println!("Energy: {}", ENERGY());
-    let phase1: Phase = Phase::new(ENERGY(), MASS, square, -X_0);
-    let (airy_wave_func1, mut boundaries1) = AiryWaveFunction::new(&phase1, (VIEW.0 / 2.0, 0.0));
-    let wave_func1 = WkbWaveFunction::new(&phase1, C_0, THETA, INTEG_STEPS, boundaries1.ts[0].0);
-    let values1 = evaluate_function_between(&wave_func1, VIEW.0 / 2.0, 0.0, NUMBER_OF_POINTS);
+    let phase: Phase = Phase::new(ENERGY(), MASS, square);
+    let (airy_wave_func1, mut boundaries1) = AiryWaveFunction::new(&phase, (VIEW.0, 0.0));
+    let wave_func1 = WkbWaveFunction::new(&phase, C_0, INTEG_STEPS, boundaries1.ts.first().unwrap().0.1);
+    let values1 = evaluate_function_between(&wave_func1, VIEW.0, 0.0, NUMBER_OF_POINTS);
 
-    let phase2: Phase = Phase::new(ENERGY(), MASS, square, X_0);
-    let (airy_wave_func2, mut boundaries2) = AiryWaveFunction::new(&phase2, (0.0, VIEW.1 / 2.0));
-    let wave_func2 = WkbWaveFunction::new(&phase2, C_0, THETA, INTEG_STEPS, boundaries2.ts.last().unwrap().0);
-    let values2 = evaluate_function_between(&wave_func2, 0.0, VIEW.1 / 2.0, NUMBER_OF_POINTS);
+    let (airy_wave_func2, mut boundaries2) = AiryWaveFunction::new(&phase, (0.0, VIEW.1));
+    let wave_func2 = WkbWaveFunction::new(&phase, C_0, INTEG_STEPS, boundaries2.ts.last().unwrap().0.1);
+    let values2 = evaluate_function_between(&wave_func2, 0.0, VIEW.1, NUMBER_OF_POINTS);
     let mut turning_point_boundaries = vec![];
     turning_point_boundaries.append(&mut boundaries1.ts);
     turning_point_boundaries.append(&mut boundaries2.ts);
@@ -139,7 +134,7 @@ async fn main() {
 
         airy_values
             .par_iter()
-            .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
+            .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
             .reduce(|| String::new(), |s: String, current: String| s + &*current)
     })
         .fold(String::new(), |s: String, current: String| s + "\n\n" + &*current);
@@ -152,7 +147,7 @@ async fn main() {
 
         airy_values
             .par_iter()
-            .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
+            .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
             .reduce(|| String::new(), |s: String, current: String| s + &*current)
     })
         .fold(String::new(), |s: String, current: String| s + "\n\n" + &*current);

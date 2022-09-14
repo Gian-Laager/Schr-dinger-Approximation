@@ -8,7 +8,12 @@ pub struct WkbWaveFunction<'a> {
 }
 
 impl WkbWaveFunction<'_> {
-    pub fn new(phase: &Phase, c: f64, theta: f64, integration_steps: usize, turning_point: f64) -> WkbWaveFunction {
+    pub fn new(
+        phase: &Phase,
+        c: f64,
+        integration_steps: usize,
+        turning_point: f64,
+    ) -> WkbWaveFunction {
         return WkbWaveFunction {
             c,
             turning_point,
@@ -21,12 +26,20 @@ impl WkbWaveFunction<'_> {
 impl Func<f64, f64> for WkbWaveFunction<'_> {
     fn eval(&self, x: f64) -> f64 {
         let integral = integrate(
-            evaluate_function_between(self.phase, self.turning_point, x, self.integration_steps),
+            evaluate_function_between(self.phase, x, self.turning_point, self.integration_steps),
             TRAPEZE_PER_THREAD,
         );
 
-
-
-        return (self.c * integral.exp()) / self.phase.momentum(x);
+        if self.phase.energy < (self.phase.potential)(x) {
+            let integral = if self.turning_point < x {
+                -integral
+            } else {
+                integral
+            };
+            return (self.c * (-integral).exp()) / self.phase.momentum(x).sqrt();
+        } else {
+            let c = self.c * 2.0;
+            return (c * (integral + f64::consts::PI / 4.0).cos()) / self.phase.momentum(x).sqrt();
+        }
     }
 }

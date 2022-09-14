@@ -45,7 +45,7 @@ impl AiryWaveFunction<'_> {
         let funcs: Vec<AiryWaveFunction<'a>> = turning_point_boundaries
             .ts
             .iter()
-            .map(|(t1, t2)| {
+            .map(|((t1, t2), _)| {
                 let x_1 = newtons_method(
                     &|x| (phase.potential)(x) - phase.energy,
                     (*t1 + *t2) / 2.0,
@@ -68,13 +68,13 @@ impl AiryWaveFunction<'_> {
     }
 }
 
-impl Func<f64, Complex64> for AiryWaveFunction<'_> {
-    fn eval(&self, x: f64) -> Complex64 {
+impl Func<f64, f64> for AiryWaveFunction<'_> {
+    fn eval(&self, x: f64) -> f64 {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
-        return (std::f64::consts::PI.sqrt()
+        return (((std::f64::consts::PI.sqrt()
             / (2.0 * self.phase.mass * derivative(&self.phase.potential, self.x_1) * H_BAR)
                 .pow(1.0 / 6.0))
-            * Ai(u_1_cube_root * (x - self.x_1));
+            * Ai(u_1_cube_root * (x - self.x_1))) as Complex64).re;
         // let ai = Ai(u_1_cube_root * (x - self.x_1));
         // let bi = Bi(u_1_cube_root * (x - self.x_1));
         // return ai + bi;
