@@ -51,10 +51,9 @@ impl AiryWaveFunction<'_> {
                     (*t1 + *t2) / 2.0,
                     1e-7,
                 );
-                let u_1 =
-                    2.0 * phase.mass / (H_BAR * H_BAR) * derivative(&|x| (phase.potential)(x), x_1);
+                let u_1 = -2.0 * phase.mass * derivative(&phase.potential, x_1) / H_BAR.powi(2);
                 // let u_1 = |x| -2.0 * phase.mass * ((phase.potential)(&x) - phase.energy) / (H_BAR * H_BAR * (x - x_1));
-                println!("u_1 = {}, x_1 = {}", u_1, x_1);
+                println!("f_0 = {}, u_1 = {}, x_1 = {}", derivative(&phase.potential, x_1), u_1, x_1);
 
                 AiryWaveFunction::<'a> {
                     u_1,
@@ -71,10 +70,10 @@ impl AiryWaveFunction<'_> {
 impl Func<f64, f64> for AiryWaveFunction<'_> {
     fn eval(&self, x: f64) -> f64 {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
-        return (((std::f64::consts::PI.sqrt()
+        return -(((std::f64::consts::PI.sqrt()
             / (2.0 * self.phase.mass * derivative(&self.phase.potential, self.x_1) * H_BAR)
                 .pow(1.0 / 6.0))
-            * Ai(u_1_cube_root * (x - self.x_1))) as Complex64).re;
+            * Ai(u_1_cube_root * -(self.x_1 - x))) as Complex64).re;
         // let ai = Ai(u_1_cube_root * (x - self.x_1));
         // let bi = Bi(u_1_cube_root * (x - self.x_1));
         // return ai + bi;

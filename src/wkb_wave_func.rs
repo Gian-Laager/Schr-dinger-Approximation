@@ -31,15 +31,9 @@ impl Func<f64, f64> for WkbWaveFunction<'_> {
         );
 
         if self.phase.energy < (self.phase.potential)(x) {
-            let integral = if self.turning_point < x {
-                -integral
-            } else {
-                integral
-            };
-            return (self.c * (-integral).exp()) / self.phase.momentum(x).sqrt();
+            return -f64::signum(x) * (self.c / 2.0 * (-integral.abs()).exp()) / self.phase.momentum(x);
         } else {
-            let c = self.c * 2.0;
-            return (c * (integral + f64::consts::PI / 4.0).cos()) / self.phase.momentum(x).sqrt();
+            return (self.c * (integral.abs() + f64::consts::PI / 4.0).cos()) / self.phase.momentum(x);
         }
     }
 }

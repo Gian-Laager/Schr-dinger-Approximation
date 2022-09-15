@@ -25,7 +25,7 @@ use tokio;
 use crate::wkb_wave_func::WkbWaveFunction;
 
 fn nth_energy_square(n: usize) -> f64 {
-    H_BAR * (2.0 * n as f64 + 1.0) * 2.0_f64.sqrt() / (2.0 * MASS.sqrt())
+    H_BAR * (2.0 * n as f64 + 1.0) * 2.0_f64.sqrt() / (2.0* MASS.sqrt())
 }
 
 const TRAPEZE_PER_THREAD: usize = 1000;
@@ -33,12 +33,12 @@ const INTEG_STEPS: usize = 10000;
 const NUMBER_OF_POINTS: usize = 100000;
 const H_BAR: f64 = 1.0;
 
-fn ENERGY() -> f64 { nth_energy_square(20) }
+fn ENERGY() -> f64 { nth_energy_square(10) }
 
-const MASS: f64 = 3.0;
+const MASS: f64 = 1.0;
 const C_0: f64 = 1.0;
 const _THETA: f64 = 0.0;
-const AIRY_EXTRA: f64 = 1.0;
+const AIRY_EXTRA: f64 = 0.0;
 
 const VIEW: (f64, f64) = (-6.0, 6.0);
 
@@ -79,8 +79,13 @@ impl Func<f64, f64> for Phase {
 
 fn square(x: f64) -> f64 {
     // 5.0 * (x + 1.0) * (x - 1.0) * (x + 2.0) * (x - 2.0) - 1.0
+    
     x * x
+    
     // (x-4.5)*(x-1.5)*(x+1.5)*(x+4.5)/4.0 + 20.0
+    
+    // let l = 3.0;
+    // -1.0 / x + l*(l+1.0) / (2.0*MASS * x * x)
 }
 
 fn order_ts(((t1, t2), _): &((f64, f64), f64)) -> (f64, f64) {
