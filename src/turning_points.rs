@@ -23,7 +23,7 @@ impl TGroup {
 
 fn validity_func(phase: Phase) -> Box<dyn Fn(f64) -> f64> {
     Box::new(move |x: f64| {
-        H_BAR / (2.0 * phase.mass).sqrt() * derivative(&|t| (phase.potential)(t), x).abs()
+        1.0 / (2.0 * phase.mass).sqrt() * derivative(&|t| (phase.potential)(t), x).abs()
             - ((phase.potential)(x) - phase.energy).pow(2)
     })
 }
@@ -82,7 +82,8 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
         assert!(t1_deriv > 0.0);
         assert!(t2_deriv < 0.0);
 
-        groups.add_ts(((t1, t2), (t1 + t2) / 2.0));
+        let turning_point = newtons_method(&|x| phase.energy - (phase.potential)(x), (t1 + t2) / 2.0, 1e-7);
+        groups.add_ts(((t1, t2), turning_point));
     }
 
     println!("{:?}", groups.ts);
