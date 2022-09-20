@@ -26,7 +26,7 @@ use crate::wkb_wave_func::WkbWaveFunction;
 use crate::newtons_method::derivative;
 
 fn nth_energy_square(n: usize) -> f64 {
-    (2.0 * n as f64 + 1.0) * 2.0_f64.sqrt() / (2.0* MASS.sqrt())
+    (2.0 * n as f64 + 1.0) * 2.0_f64.sqrt() / (2.0 * MASS.sqrt())
 }
 
 const TRAPEZE_PER_THREAD: usize = 1000;

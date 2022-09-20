@@ -35,7 +35,7 @@ pub struct AiryWaveFunction<'a> {
 
 impl AiryWaveFunction<'_> {
     fn get_u_1_cube_root(u_1: f64) -> f64 {
-       signum(u_1) * u_1.abs().pow(1.0 / 3.0)
+        signum(u_1) * u_1.abs().pow(1.0 / 3.0)
     }
 
     pub fn new<'a>(phase: &'a Phase, view: (f64, f64)) -> (Vec<AiryWaveFunction<'a>>, TGroup) {
@@ -53,7 +53,12 @@ impl AiryWaveFunction<'_> {
                 );
                 let u_1 = 2.0 * phase.mass * -derivative(&phase.potential, x_1);
                 // let u_1 = |x| -2.0 * phase.mass * ((phase.potential)(&x) - phase.energy) / (H_BAR * H_BAR * (x - x_1));
-                println!("f_0 = {}, u_1 = {}, x_1 = {}", derivative(&phase.potential, x_1), u_1, x_1);
+                println!(
+                    "f_0 = {}, u_1 = {}, x_1 = {}",
+                    derivative(&phase.potential, x_1),
+                    u_1,
+                    x_1
+                );
 
                 AiryWaveFunction::<'a> {
                     u_1,
@@ -70,10 +75,19 @@ impl AiryWaveFunction<'_> {
 impl Func<f64, f64> for AiryWaveFunction<'_> {
     fn eval(&self, x: f64) -> f64 {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
-        return (((std::f64::consts::PI.sqrt()
-            / (2.0 * self.phase.mass * -derivative(&self.phase.potential, self.x_1))
-                .abs().pow(1.0 / 6.0))
-            * Ai(complex(u_1_cube_root * (self.x_1 - x), 0.0))) as Complex64).re;
+
+        let c = if derivative(&self.phase.potential, x) > 0.0 {
+            -1.0
+        } else {
+            1.0
+        };
+
+        return c * (((std::f64::consts::PI.sqrt()
+            / (self.u_1)
+                .abs()
+                .pow(1.0 / 6.0))
+            * Ai(complex(u_1_cube_root * (self.x_1 - x),  0.0))) as Complex64)
+            .re;
         // let ai = Ai(u_1_cube_root * (x - self.x_1));
         // let bi = Bi(u_1_cube_root * (x - self.x_1));
         // return ai + bi;
