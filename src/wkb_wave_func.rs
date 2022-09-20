@@ -31,9 +31,9 @@ impl Func<f64, f64> for WkbWaveFunction<'_> {
         );
 
         if self.phase.energy < (self.phase.potential)(x) {
-            return (self.c *  (-integral.abs()).exp()) / self.phase.momentum(x);
+            return (self.c * 0.5 * (-integral.abs()).exp()) / self.phase.momentum(x);
         } else {
-            return (self.c * 2.0 *  (-integral + f64::consts::PI / 4.0).cos()) / self.phase.momentum(x);
+            return (self.c *  (-integral + f64::consts::PI / 4.0).cos()) / self.phase.momentum(x);
         }
     }
 }

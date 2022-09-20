@@ -68,10 +68,10 @@ impl Phase {
 
     fn momentum(self, x: f64) -> f64 {
         if derivative(&self.potential, x) < 0.0 {
-            self.eval(x).abs().sqrt()
+            -self.eval(x).abs().sqrt()
         }
         else {
-            -self.eval(x).abs().sqrt()
+            self.eval(x).abs().sqrt()
         }
     }
 }
@@ -79,10 +79,10 @@ impl Phase {
 impl Func<f64, f64> for Phase {
     fn eval(&self, x: f64) -> f64 {
         if derivative(&self.potential, x) < 0.0 {
-            return (2.0 * self.mass) * ((self.potential)(x) - self.energy).abs().sqrt();
+            return -(2.0 * self.mass) * ((self.potential)(x) - self.energy).abs().sqrt();
         }
         else {
-            return -(2.0 * self.mass) * ((self.potential)(x) - self.energy).abs().sqrt();
+            return (2.0 * self.mass) * ((self.potential)(x) - self.energy).abs().sqrt();
         }
     }
 }

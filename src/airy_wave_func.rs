@@ -77,9 +77,9 @@ impl Func<f64, f64> for AiryWaveFunction<'_> {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
 
         let c = if derivative(&self.phase.potential, x) > 0.0 {
-            -1.0
-        } else {
             1.0
+        } else {
+            -1.0
         };
 
         return c * (((std::f64::consts::PI.sqrt()
