@@ -76,13 +76,7 @@ impl Func<f64, f64> for AiryWaveFunction<'_> {
     fn eval(&self, x: f64) -> f64 {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
 
-        let c = if derivative(&self.phase.potential, x) > 0.0 {
-            1.0
-        } else {
-            -1.0
-        };
-
-        return c * (((std::f64::consts::PI.sqrt()
+        return (((std::f64::consts::PI.sqrt()
             / (self.u_1)
                 .abs()
                 .pow(1.0 / 6.0))
@@ -97,6 +91,7 @@ impl Func<f64, f64> for AiryWaveFunction<'_> {
 #[cfg(test)]
 mod test {
     use super::*;
+
 
     #[test]
     fn airy_func_plot() {
