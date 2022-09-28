@@ -86,14 +86,12 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
         groups.add_ts(((t1, t2), turning_point));
     }
 
-    println!("{:?}", groups.ts);
     return groups;
 }
 
 pub fn calc_ts(phase: &Phase, view: (f64, f64)) -> TGroup {
     // return TGroup{ts:vec![(-4.692, -4.255), (4.255, 4.692)]};
     let zeros = find_zeros(phase, view);
-    println!("zeros: {:?}", zeros);
     return group_ts(&zeros, phase);
 }
 

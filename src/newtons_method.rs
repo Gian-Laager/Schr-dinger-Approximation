@@ -127,9 +127,6 @@ pub fn newtons_method_2d<F>(f: &F, mut guess: f64, precision: f64) -> f64
 {
     loop {
         let jacobian = gradient(f, guess);
-        println!("guess: {:?}", guess);
-        println!("f(guess): {:?}", f(guess));
-        println!("inverse jacobian: {:?}", jacobian.pseudo_inverse());
         let step: f64 = jacobian.pseudo_inverse() * f(guess);
         if step.abs() < precision {
             return guess;
