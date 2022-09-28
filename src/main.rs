@@ -123,7 +123,7 @@ fn ask_user_for_view(lower_bound: Option<f64>, upper_bound: Option<f64>) -> (f64
 }
 
 fn main() {
-    let energy = energy::nth_energy(N_ENERGY, 1.0, &potential, (-100.0, 100.0));
+    let energy = energy::nth_energy(N_ENERGY, 1.0, &potential, APPROX_INF);
     println!("Energy: {}", energy);
 
     let lower_bound = newtons_method::newtons_method_max_iters(
