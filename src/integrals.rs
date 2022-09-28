@@ -21,11 +21,12 @@ impl<A, R> Function<A, R> {
     }
 }
 
-impl Func<f64, Complex64> for Function<f64, Complex64> {
-    fn eval(&self, x: f64) -> Complex64 {
+impl<A, R> Func<A, R> for Function<A, R> {
+    fn eval(&self, x: A) -> R {
         (self.f)(x)
     }
 }
+
 pub struct Point<T_X, T_Y> {
     pub x: T_X,
     pub y: T_Y,

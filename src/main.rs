@@ -2,6 +2,7 @@
 
 mod airy;
 mod airy_wave_func;
+mod energy;
 mod integrals;
 mod newtons_method;
 mod turning_points;
@@ -21,28 +22,22 @@ use rayon::iter::*;
 use std::f64;
 use std::f64::consts::PI;
 use std::fs::File;
+use std::io;
 use std::io::Write;
 use std::process::Command;
 use tokio;
 
-fn nth_energy_square(n: usize) -> f64 {
-    (2.0 * n as f64 + 1.0) * 2.0_f64.sqrt() / (2.0 * MASS.sqrt())
-}
-
+const INTEG_STEPS: usize = 64000;
 const TRAPEZE_PER_THREAD: usize = 1000;
-const INTEG_STEPS: usize = 10000;
 const NUMBER_OF_POINTS: usize = 100000;
-
-fn ENERGY() -> f64 {
-    nth_energy_square(12)
-}
 
 const MASS: f64 = 1.0;
 const C_0: f64 = 1.0;
-const _THETA: f64 = 0.0;
 const AIRY_EXTRA: f64 = 1.0;
+const N_ENERGY: usize = 12;
 
-const VIEW: (f64, f64) = (-6.0, 6.0);
+const APPROX_INF: (f64, f64) = (-100.0, 100.0);
+const VIEW_FACTOR: f64 = 1.5;
 
 #[derive(Copy, Clone)]
 pub struct Phase {
@@ -78,78 +73,92 @@ impl Phase {
 
 impl Func<f64, f64> for Phase {
     fn eval(&self, x: f64) -> f64 {
-       (2.0 * self.mass * ((self.potential)(x) - self.energy)).abs().sqrt()
+        (2.0 * self.mass * ((self.potential)(x) - self.energy))
+            .abs()
+            .sqrt()
     }
 }
 
-fn square(x: f64) -> f64 {
+fn potential(x: f64) -> f64 {
     // 5.0 * (x + 1.0) * (x - 1.0) * (x + 2.0) * (x - 2.0) - 1.0
-
-    x * x
-
-    // (x-4.5)*(x-1.5)*(x+1.5)*(x+4.5)/4.0 + 20.0
-
-    // let l = 3.0;
-    // -1.0 / x + l*(l+1.0) / (2.0*MASS * x * x)
+   (x * x) // (x-4.5)*(x-1.5)*(x+1.5)*(x+4.5)/4.0 + 20.0
+                  // let l = 3.0;
+                  // -1.0 / x + l*(l+1.0) / (2.0*MASS * x * x)
 }
 
 fn order_ts(((t1, t2), _): &((f64, f64), f64)) -> (f64, f64) {
     return if t1 > t2 { (*t2, *t1) } else { (*t1, *t2) };
 }
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() {
-    // {
-    //     let mut phase_off = -f64::consts::PI;
-    //     const RANGE: f64 = 0.75;
-    //
-    //     struct WaveDeriv<'a, 'b> {
-    //         wave: &'a WkbWaveFunction<'b>,
-    //     }
-    //
-    //     impl Func<f64, f64> for WaveDeriv<'_, '_> {
-    //         fn eval(&self, x: f64) -> f64 {
-    //             return derivative(&|x| self.wave.eval(x), x);
-    //         }
-    //     }
-    //
-    //     let mut min_diff = f64::NAN;
-    //     let mut optimal_phase = 0.0;
-    //
-    //     while phase_off < f64::consts::PI {
-    //         let phase: Phase = Phase::new(ENERGY(), MASS, square, f64::consts::PI / 4.0);
-    //         let (_, boundaries1) = AiryWaveFunction::new(&phase, (VIEW.0, 0.0));
-    //         let wave_func1 =
-    //             WkbWaveFunction::new(&phase, C_0, INTEG_STEPS, boundaries1.ts.first().unwrap().1);
-    //
-    //         let (_, boundaries2) = AiryWaveFunction::new(&phase, (0.0, VIEW.1));
-    //         let wave_func2 =
-    //             WkbWaveFunction::new(&phase, C_0, INTEG_STEPS, boundaries2.ts.last().unwrap().1);
-    //         let diff = (wave_func2.eval(0.0) - wave_func1.eval(0.0)).abs();
-    //
-    //         if min_diff.is_nan() {
-    //             min_diff = diff;
-    //             optimal_phase = phase_off;
-    //         } else if diff > min_diff {
-    //             min_diff = diff;
-    //             optimal_phase = phase_off;
-    //         }
-    //         phase_off += 0.1;
-    //     }
-    //
-    //     println!("min_diff: {}, phase: {}", min_diff, optimal_phase);
-    // }
-    println!("Energy: {}", ENERGY());
-    let phase: Phase = Phase::new(ENERGY(), MASS, square, f64::consts::PI / 4.0);
-    let (airy_wave_func1, mut boundaries1) = AiryWaveFunction::new(&phase, (VIEW.0, 0.0));
+fn get_float_from_user(message: &str) -> f64 {
+    loop {
+        println!("{}", message);
+        let mut input = String::new();
+        
+        // io::stdout().lock().write(message.as_ref()).unwrap();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Not a valid string");
+        println!("");
+        let num = input.trim().parse();
+        if num.is_ok() {
+            return num.unwrap();
+        }
+    }
+}
+
+fn get_user_bounds() -> (f64, f64) {
+    let user_bound_lower: f64 = get_float_from_user("Lower Bound: ");
+
+    let user_bound_upper: f64 = get_float_from_user("Upper_bound: ");
+    return (user_bound_lower, user_bound_upper);
+}
+fn ask_user_for_view(lower_bound: Option<f64>, upper_bound: Option<f64>) -> (f64, f64) {
+    println!("Failed to determine boundary of the graph automatically.");
+    println!("Pleas enter values manualy.");
+    lower_bound.map(|b| println!("(Suggestion for lower bound: {})", b));
+    upper_bound.map(|b| println!("(Suggestion for upper bound: {})", b));
+
+    return get_user_bounds();
+}
+
+fn main() {
+    let energy = energy::nth_energy(N_ENERGY, 1.0, &potential, (-100.0, 100.0));
+    println!("Energy: {}", energy);
+
+    let lower_bound = newtons_method::newtons_method_max_iters(
+        &|x| potential(x) - energy,
+        APPROX_INF.0,
+        1e-7,
+        100000,
+    );
+    let upper_bound = newtons_method::newtons_method_max_iters(
+        &|x| potential(x) - energy,
+        APPROX_INF.1,
+        1e-7,
+        100000,
+    );
+
+    let view = if lower_bound.is_none() || upper_bound.is_none() {
+        ask_user_for_view(lower_bound, upper_bound)
+    } else {
+        (
+            lower_bound.unwrap() * VIEW_FACTOR,
+            upper_bound.unwrap() * VIEW_FACTOR,
+        )
+    };
+
+    println!("View: {:?}", view);
+    let phase: Phase = Phase::new(energy, MASS, potential, f64::consts::PI / 4.0);
+    let (airy_wave_func1, mut boundaries1) = AiryWaveFunction::new(&phase, (view.0, 0.0));
     let wave_func1 =
         WkbWaveFunction::new(&phase, C_0, INTEG_STEPS, boundaries1.ts.first().unwrap().1);
-    let values1 = evaluate_function_between(&wave_func1, VIEW.0, 0.0, NUMBER_OF_POINTS);
+    let values1 = evaluate_function_between(&wave_func1, view.0, 0.0, NUMBER_OF_POINTS);
 
-    let (airy_wave_func2, mut boundaries2) = AiryWaveFunction::new(&phase, (0.0, VIEW.1));
+    let (airy_wave_func2, mut boundaries2) = AiryWaveFunction::new(&phase, (0.0, view.1));
     let wave_func2 =
         WkbWaveFunction::new(&phase, C_0, INTEG_STEPS, boundaries2.ts.last().unwrap().1);
-    let values2 = evaluate_function_between(&wave_func2, 0.0, VIEW.1, NUMBER_OF_POINTS);
+    let values2 = evaluate_function_between(&wave_func2, 0.0, view.1, NUMBER_OF_POINTS);
     let mut turning_point_boundaries = vec![];
     turning_point_boundaries.append(&mut boundaries1.ts);
     turning_point_boundaries.append(&mut boundaries2.ts);
@@ -226,9 +235,9 @@ async fn main() {
     data_str.push_str(&*airy_data_str);
 
     let pot_re_to_c = Function {
-        f: |x| complex(square(x), 0.0),
+        f: |x| complex(potential(x), 0.0),
     };
-    let potential = evaluate_function_between(&pot_re_to_c, VIEW.0, VIEW.1, NUMBER_OF_POINTS);
+    let potential = evaluate_function_between(&pot_re_to_c, view.0, view.1, NUMBER_OF_POINTS);
 
     let pot_str = potential
         .par_iter()
@@ -252,8 +261,33 @@ async fn main() {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::cmp::Ordering;
+
+    fn pot(x: f64) -> f64 {
+        1.0 / (x * x)
+    }
+
+    fn pot_in(x: f64) -> f64 {
+        1.0 / x.sqrt()
+    }
 
     #[test]
     fn phase_off() {
+        let energy_cond = |e: f64| -> f64 { (0.5 * (e - 0.5)) % 1.0 };
+
+        let integ = Function::<f64, f64>::new(energy_cond);
+        let mut values = evaluate_function_between(&integ, 0.0, 5.0, NUMBER_OF_POINTS);
+        let sort_func =
+            |p1: &Point<f64, f64>, p2: &Point<f64, f64>| -> Ordering { cmp_f64(&p1.x, &p2.x) };
+        values.sort_by(sort_func);
+
+        let mut data_file = File::create("energy.txt").unwrap();
+
+        let data_str: String = values
+            .par_iter()
+            .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
+            .reduce(|| String::new(), |s: String, current: String| s + &*current);
+
+        data_file.write_all((data_str).as_ref()).unwrap()
     }
 }

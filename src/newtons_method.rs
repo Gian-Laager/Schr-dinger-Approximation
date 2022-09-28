@@ -294,6 +294,10 @@ pub fn newtons_method_find_new_zero<F>(
     newtons_method_max_iters(&f_modified, guess, precision, max_iters)
 }
 
+pub fn inverse<F, A, R>(f: &F) -> Box<dyn Fn(R) -> Vec<A>> where F: Fn(A) -> R {
+    todo!();  
+}
+
 #[cfg(test)]
 mod test {
     use num::zero;
