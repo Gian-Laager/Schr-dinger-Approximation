@@ -33,8 +33,8 @@ const NUMBER_OF_POINTS: usize = 100000;
 
 const MASS: f64 = 1.0;
 const C_0: f64 = 1.0;
-const AIRY_EXTRA: f64 = 1.0;
-const N_ENERGY: usize = 12;
+const AIRY_EXTRA: f64 = 0.0;
+const N_ENERGY: usize = 20;
 
 const APPROX_INF: (f64, f64) = (-100.0, 100.0);
 const VIEW_FACTOR: f64 = 1.5;
@@ -80,13 +80,10 @@ impl Func<f64, f64> for Phase {
 }
 
 fn potential(x: f64) -> f64 {
-    // 5.0 * (x + 1.0) * (x - 1.0) * (x + 2.0) * (x - 2.0) - 1.0
-   (x * x) // (x-4.5)*(x-1.5)*(x+1.5)*(x+4.5)/4.0 + 20.0
-                  // let l = 3.0;
-                  // -1.0 / x + l*(l+1.0) / (2.0*MASS * x * x)
+    x * x
 }
 
-fn order_ts(((t1, t2), _): &((f64, f64), f64)) -> (f64, f64) {
+fn order_ts((t1, t2): &(f64, f64)) -> (f64, f64) {
     return if t1 > t2 { (*t2, *t1) } else { (*t1, *t2) };
 }
 
@@ -94,7 +91,7 @@ fn get_float_from_user(message: &str) -> f64 {
     loop {
         println!("{}", message);
         let mut input = String::new();
-        
+
         // io::stdout().lock().write(message.as_ref()).unwrap();
         io::stdin()
             .read_line(&mut input)
@@ -150,22 +147,60 @@ fn main() {
 
     println!("View: {:?}", view);
     let phase: Phase = Phase::new(energy, MASS, potential, f64::consts::PI / 4.0);
-    let (airy_wave_func1, mut boundaries1) = AiryWaveFunction::new(&phase, (view.0, 0.0));
-    let wave_func1 =
-        WkbWaveFunction::new(&phase, C_0, INTEG_STEPS, boundaries1.ts.first().unwrap().1);
-    let values1 = evaluate_function_between(&wave_func1, view.0, 0.0, NUMBER_OF_POINTS);
+    let (_, t_boundaries) = AiryWaveFunction::new(&phase, (view.0, view.1));
+    println!(
+        "{:?}",
+        t_boundaries.ts.iter().map(|p| p.1).collect::<Vec<f64>>()
+    );
 
-    let (airy_wave_func2, mut boundaries2) = AiryWaveFunction::new(&phase, (0.0, view.1));
-    let wave_func2 =
-        WkbWaveFunction::new(&phase, C_0, INTEG_STEPS, boundaries2.ts.last().unwrap().1);
-    let values2 = evaluate_function_between(&wave_func2, 0.0, view.1, NUMBER_OF_POINTS);
-    let mut turning_point_boundaries = vec![];
-    turning_point_boundaries.append(&mut boundaries1.ts);
-    turning_point_boundaries.append(&mut boundaries2.ts);
+    let (airy_wave_func, boundaries) = AiryWaveFunction::new(&phase, (view.0, view.1));
+
+    if boundaries.ts.len() == 0 {
+        panic!("No turning points found!");
+    }
+
+    let turning_point_boundaries: Vec<(f64, f64)> = boundaries.ts.iter().map(|p| p.0).collect();
+
+    let turning_points: Vec<f64> = [
+        vec![2.0 * view.0 - boundaries.ts.first().unwrap().1],
+        boundaries.ts.iter().map(|p| p.1).collect(),
+        vec![2.0 * view.1 - boundaries.ts.last().unwrap().1],
+    ]
+    .concat();
+
+    let wave_funcs = turning_points
+        .iter()
+        .zip(turning_points.iter().skip(1))
+        .zip(turning_points.iter().skip(2))
+        .map(
+            |((previous, boundary), next)| -> (WkbWaveFunction, (f64, f64)) {
+                println!(
+                    "WKB between: ({:.12}, {:.12}), prev: {:.12}, current: {:.12}, next: {:.12}",
+                    (boundary + previous) / 2.0,
+                    (next + boundary) / 2.0,
+                    previous,
+                    boundary,
+                    next
+                );
+                (
+                    WkbWaveFunction::new(&phase, C_0, INTEG_STEPS, *boundary),
+                    ((boundary + previous) / 2.0, (next + boundary) / 2.0),
+                )
+            },
+        )
+        .collect::<Vec<(WkbWaveFunction, (f64, f64))>>();
+
+    let values = wave_funcs
+        .par_iter()
+        .map(|(w, (a, b))| {
+            println!("eval between: ({:.12}, {:.12})", a, b);
+            evaluate_function_between(w, *a, *b, NUMBER_OF_POINTS)})
+        .flatten()
+        .collect::<Vec<Point<f64, f64>>>();
 
     let mut data_file = File::create("data.txt").unwrap();
 
-    let mut data_str: String = values1
+    let mut data_str: String = values
         .par_iter()
         .filter(|p| {
             (turning_point_boundaries.clone())
@@ -177,44 +212,7 @@ fn main() {
         .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
         .reduce(|| String::new(), |s: String, current: String| s + &*current);
 
-    data_str.push_str(
-        &*values2
-            .par_iter()
-            .filter(|p| {
-                (turning_point_boundaries.clone())
-                    .iter()
-                    .map(order_ts)
-                    .map(|(t1, t2)| p.x < t1 || p.x > t2)
-                    .fold(true, |a, b| a && b)
-            })
-            .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
-            .reduce(|| String::new(), |s: String, current: String| s + &*current),
-    );
-
-    let airy_wave_funcs = airy_wave_func1;
-    let airy_data_str = airy_wave_funcs
-        .iter()
-        .map(|airy_wave_func| {
-            let airy_values = evaluate_function_between(
-                airy_wave_func,
-                airy_wave_func.ts.0 - AIRY_EXTRA,
-                airy_wave_func.ts.1 + AIRY_EXTRA,
-                NUMBER_OF_POINTS,
-            );
-
-            airy_values
-                .par_iter()
-                .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
-                .reduce(|| String::new(), |s: String, current: String| s + &*current)
-        })
-        .fold(String::new(), |s: String, current: String| {
-            s + "\n\n" + &*current
-        });
-    data_str.push_str(&*airy_data_str);
-
-    let airy_wave_funcs = airy_wave_func2;
-
-    let airy_data_str = airy_wave_funcs
+    let airy_data_str = airy_wave_func
         .iter()
         .map(|airy_wave_func| {
             let airy_values = evaluate_function_between(
