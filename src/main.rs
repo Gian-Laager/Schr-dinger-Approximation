@@ -252,7 +252,7 @@ fn main() {
 
     let mut plot_3d_file = File::create("plot.gnuplot").unwrap();
 
-    let plot_3d_cmd = "plot \"data.txt\" i 0 u 1:2 t \"WKB\" w l, \"data.txt\" i 1 u 1:2 t \"Airy 1\" w l, \"data.txt\" i 2 u 1:2 t \"Ariy 2\" w l";
+    let plot_3d_cmd = "plot \"data.txt\" i 0 u 1:2 t \"WKB\", \"data.txt\" i 1 u 1:2 t \"Airy 1\", \"data.txt\" i 2 u 1:2 t \"Ariy 2\"";
     plot_3d_file.write_all(plot_3d_cmd.as_ref()).unwrap();
 }
 
