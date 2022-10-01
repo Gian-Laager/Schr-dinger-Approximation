@@ -100,7 +100,7 @@ fn gradient<F>(f: F, x: f64) -> Vec2 where F: Fn(f64) -> Vec2 {
 
 pub fn derivative<F, R>(f: &F, x: f64) -> R
     where
-        F: Fn(f64) -> R,
+        F: Fn(f64) -> R + ?Sized,
         R: Sub<R, Output=R> + Div<f64, Output=R>,
 {
     let epsilon = f64::epsilon().sqrt();

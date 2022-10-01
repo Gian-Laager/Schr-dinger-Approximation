@@ -40,11 +40,11 @@ const N_ENERGY: usize = 20;
 const APPROX_INF: (f64, f64) = (-200.0, 200.0);
 const VIEW_FACTOR: f64 = 1.5;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Phase {
     energy: f64,
     mass: f64,
-    potential: fn(f64) -> f64,
+    potential: Arc<dyn Fn(f64) -> f64 + Send + Sync>,
     phase_off: f64,
 }
 
@@ -53,21 +53,21 @@ impl Phase {
         Phase {
             energy: 0.0,
             mass: 0.0,
-            potential: |_x| 0.0,
+            potential: Arc::new(|_x| 0.0),
             phase_off: f64::consts::PI / 4.0,
         }
     }
 
-    fn new(energy: f64, mass: f64, potential: fn(f64) -> f64, phase_off: f64) -> Phase {
+    fn new<F: Fn(f64) -> f64 + Sync + Send>(energy: f64, mass: f64, potential: &'static F, phase_off: f64) -> Phase {
         return Phase {
             energy,
             mass,
-            potential,
+            potential: Arc::new(potential),
             phase_off,
         };
     }
 
-    fn momentum(self, x: f64) -> f64 {
+    fn momentum(&self, x: f64) -> f64 {
         self.eval(x).abs().sqrt()
     }
 }
@@ -148,7 +148,7 @@ fn main() {
     };
 
     println!("View: {:?}", view);
-    let phase = Arc::new(Phase::new(energy, MASS, potential, f64::consts::PI / 4.0));
+    let phase = Arc::new(Phase::new(energy, MASS, &potential, f64::consts::PI / 4.0));
     let (_, t_boundaries) = AiryWaveFunction::new(phase.clone(), (view.0, view.1));
     println!(
         "{:?}",

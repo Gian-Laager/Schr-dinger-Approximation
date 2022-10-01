@@ -51,7 +51,7 @@ impl AiryWaveFunction {
                     (*t1 + *t2) / 2.0,
                     1e-7,
                 );
-                let u_1 = 2.0 * phase.mass * -derivative(&phase.potential, x_1);
+                let u_1 = 2.0 * phase.mass * -derivative(phase.potential.as_ref(), x_1);
                 // let u_1 = |x| -2.0 * phase.mass * ((phase.potential)(&x) - phase.energy) / (H_BAR * H_BAR * (x - x_1));
 
                 AiryWaveFunction {
