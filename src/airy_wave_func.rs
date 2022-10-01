@@ -26,23 +26,23 @@ fn Bi(x: Complex64) -> Complex64 {
         + 2.0 * Ai(x * complex(-0.5, 3.0_f64.sqrt() / 2.0)) * complex(3_f64.sqrt() / 2.0, 0.5);
 }
 
-pub struct AiryWaveFunction<'a> {
+pub struct AiryWaveFunction {
     u_1: f64,
     x_1: f64,
-    phase: &'a Phase,
+    phase: Arc<Phase>,
     pub ts: (f64, f64),
 }
 
-impl AiryWaveFunction<'_> {
+impl AiryWaveFunction {
     fn get_u_1_cube_root(u_1: f64) -> f64 {
         signum(u_1) * u_1.abs().pow(1.0 / 3.0)
     }
 
-    pub fn new<'a>(phase: &'a Phase, view: (f64, f64)) -> (Vec<AiryWaveFunction<'a>>, TGroup) {
+    pub fn new<'a>(phase: Arc<Phase>, view: (f64, f64)) -> (Vec<AiryWaveFunction>, TGroup) {
         let phase = phase;
-        let turning_point_boundaries = turning_points::calc_ts(phase, view);
+        let turning_point_boundaries = turning_points::calc_ts(phase.as_ref(), view);
 
-        let funcs: Vec<AiryWaveFunction<'a>> = turning_point_boundaries
+        let funcs: Vec<AiryWaveFunction> = turning_point_boundaries
             .ts
             .iter()
             .map(|((t1, t2), _)| {
@@ -54,37 +54,31 @@ impl AiryWaveFunction<'_> {
                 let u_1 = 2.0 * phase.mass * -derivative(&phase.potential, x_1);
                 // let u_1 = |x| -2.0 * phase.mass * ((phase.potential)(&x) - phase.energy) / (H_BAR * H_BAR * (x - x_1));
 
-                AiryWaveFunction::<'a> {
+                AiryWaveFunction {
                     u_1,
                     x_1,
-                    phase,
+                    phase: phase.clone(),
                     ts: (*t1, *t2),
                 }
             })
-            .collect::<Vec<AiryWaveFunction<'a>>>();
+            .collect::<Vec<AiryWaveFunction>>();
         return (funcs, turning_point_boundaries);
     }
 }
 
-impl Func<f64, Complex64> for AiryWaveFunction<'_> {
+impl Func<f64, Complex64> for AiryWaveFunction {
     fn eval(&self, x: f64) -> Complex64 {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
 
-        return ((std::f64::consts::PI.sqrt()
-            / (self.u_1)
-                .abs()
-                .pow(1.0 / 6.0))
-            * Ai(complex(u_1_cube_root * (self.x_1 - x),  0.0))) as Complex64;
-        // let ai = Ai(u_1_cube_root * (x - self.x_1));
-        // let bi = Bi(u_1_cube_root * (x - self.x_1));
-        // return ai + bi;
+        return ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
+            * Ai(complex(u_1_cube_root * (self.x_1 - x), 0.0))) as Complex64
+            * complex((self.u_1.signum() * (self.x_1 - x) + self.phase.phase_off).cos(), (self.u_1.signum() * (self.x_1 - x) + self.phase.phase_off).sin());
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-
 
     #[test]
     fn airy_func_plot() {

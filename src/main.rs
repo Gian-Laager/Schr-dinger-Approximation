@@ -26,6 +26,7 @@ use std::io;
 use std::io::Write;
 use std::process::Command;
 use tokio;
+use std::sync::Arc;
 
 const INTEG_STEPS: usize = 64000;
 const TRAPEZE_PER_THREAD: usize = 1000;
@@ -33,8 +34,8 @@ const NUMBER_OF_POINTS: usize = 100000;
 
 const MASS: f64 = 1.0;
 const C_0: f64 = 1.0;
-const AIRY_EXTRA: f64 = 0.5;
-const N_ENERGY: usize = 5;
+const AIRY_EXTRA: f64 = 0.1;
+const N_ENERGY: usize = 20;
 
 const APPROX_INF: (f64, f64) = (-200.0, 200.0);
 const VIEW_FACTOR: f64 = 1.5;
@@ -81,7 +82,7 @@ impl Func<f64, f64> for Phase {
 
 fn potential(x: f64) -> f64 {
     // (x - 2.0).powi(4) * (x + 2.0).powi(4)
-    x*x
+    x * x
 }
 
 fn order_ts((t1, t2): &(f64, f64)) -> (f64, f64) {
@@ -147,14 +148,14 @@ fn main() {
     };
 
     println!("View: {:?}", view);
-    let phase: Phase = Phase::new(energy, MASS, potential, f64::consts::PI / 4.0);
-    let (_, t_boundaries) = AiryWaveFunction::new(&phase, (view.0, view.1));
+    let phase = Arc::new(Phase::new(energy, MASS, potential, f64::consts::PI / 4.0));
+    let (_, t_boundaries) = AiryWaveFunction::new(phase.clone(), (view.0, view.1));
     println!(
         "{:?}",
         t_boundaries.ts.iter().map(|p| p.1).collect::<Vec<f64>>()
     );
 
-    let (airy_wave_func, boundaries) = AiryWaveFunction::new(&phase, (view.0, view.1));
+    let (airy_wave_func, boundaries) = AiryWaveFunction::new(phase.clone(), (view.0, view.1));
 
     if boundaries.ts.len() == 0 {
         panic!("No turning points found!");
@@ -184,7 +185,7 @@ fn main() {
                     next
                 );
                 (
-                    WkbWaveFunction::new(&phase, C_0, INTEG_STEPS, *boundary),
+                    WkbWaveFunction::new(phase.clone(), C_0, INTEG_STEPS, *boundary),
                     ((boundary + previous) / 2.0, (next + boundary) / 2.0),
                 )
             },
@@ -195,7 +196,8 @@ fn main() {
         .par_iter()
         .map(|(w, (a, b))| {
             println!("eval between: ({:.12}, {:.12})", a, b);
-            evaluate_function_between(w, *a, *b, NUMBER_OF_POINTS)})
+            evaluate_function_between(w, *a, *b, NUMBER_OF_POINTS)
+        })
         .flatten()
         .collect::<Vec<Point<f64, Complex64>>>();
 

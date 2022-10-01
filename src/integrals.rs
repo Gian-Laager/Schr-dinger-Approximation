@@ -3,7 +3,7 @@ use crate::Complex64;
 use crate::*;
 use rayon::prelude::*;
 
-pub trait Func<A, R>: Sync {
+pub trait Func<A, R>: Sync + Send{
     fn eval(&self, x: A) -> R;
 }
 
