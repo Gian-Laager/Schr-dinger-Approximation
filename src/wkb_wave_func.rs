@@ -23,17 +23,24 @@ impl WkbWaveFunction<'_> {
     }
 }
 
-impl Func<f64, f64> for WkbWaveFunction<'_> {
-    fn eval(&self, x: f64) -> f64 {
+impl Func<f64, Complex64> for WkbWaveFunction<'_> {
+    fn eval(&self, x: f64) -> Complex64 {
         let integral = integrate(
             evaluate_function_between(self.phase, x, self.turning_point, self.integration_steps),
             TRAPEZE_PER_THREAD,
         );
 
         if self.phase.energy < (self.phase.potential)(x) {
-            return (self.c * 0.5 * (-integral.abs()).exp()) / self.phase.momentum(x);
+            return complex(
+                (self.c * 0.5 * (-integral.abs()).exp()) / self.phase.momentum(x),
+                0.0,
+            );
         } else {
-            return (self.c * (integral.abs() - self.phase.phase_off).cos()) / self.phase.momentum(x);
+            return complex(
+                self.c * (integral.abs() - self.phase.phase_off).cos(),
+                0.0
+                // self.c * (-integral.abs() - self.phase.phase_off).sin(),
+            ) / self.phase.momentum(x);
         }
     }
 }

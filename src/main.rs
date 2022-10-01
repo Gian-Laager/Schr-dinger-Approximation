@@ -33,10 +33,10 @@ const NUMBER_OF_POINTS: usize = 100000;
 
 const MASS: f64 = 1.0;
 const C_0: f64 = 1.0;
-const AIRY_EXTRA: f64 = 0.0;
-const N_ENERGY: usize = 20;
+const AIRY_EXTRA: f64 = 0.5;
+const N_ENERGY: usize = 5;
 
-const APPROX_INF: (f64, f64) = (-100.0, 100.0);
+const APPROX_INF: (f64, f64) = (-200.0, 200.0);
 const VIEW_FACTOR: f64 = 1.5;
 
 #[derive(Copy, Clone)]
@@ -80,7 +80,8 @@ impl Func<f64, f64> for Phase {
 }
 
 fn potential(x: f64) -> f64 {
-    x * x
+    // (x - 2.0).powi(4) * (x + 2.0).powi(4)
+    x*x
 }
 
 fn order_ts((t1, t2): &(f64, f64)) -> (f64, f64) {
@@ -196,7 +197,7 @@ fn main() {
             println!("eval between: ({:.12}, {:.12})", a, b);
             evaluate_function_between(w, *a, *b, NUMBER_OF_POINTS)})
         .flatten()
-        .collect::<Vec<Point<f64, f64>>>();
+        .collect::<Vec<Point<f64, Complex64>>>();
 
     let mut data_file = File::create("data.txt").unwrap();
 
@@ -209,7 +210,7 @@ fn main() {
                 .map(|(t1, t2)| p.x < t1 || p.x > t2)
                 .fold(true, |a, b| a && b)
         })
-        .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
+        .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
         .reduce(|| String::new(), |s: String, current: String| s + &*current);
 
     let airy_data_str = airy_wave_func
@@ -224,7 +225,7 @@ fn main() {
 
             airy_values
                 .par_iter()
-                .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
+                .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
                 .reduce(|| String::new(), |s: String, current: String| s + &*current)
         })
         .fold(String::new(), |s: String, current: String| {
@@ -250,10 +251,10 @@ fn main() {
     let plot_3d_cmd = "splot \"data.txt\" i 0 u 1:2:3 t \"WKB\" w l, \"data.txt\" i 1 u 1:2:3 t \"Airy 1\" w l, \"data.txt\" i 2 u 1:2:3 t \"Ariy 2\" w l";
     plot_3d_file.write_all(plot_3d_cmd.as_ref()).unwrap();
 
-    let mut plot_3d_file = File::create("plot.gnuplot").unwrap();
+    let mut plot_file = File::create("plot.gnuplot").unwrap();
 
-    let plot_3d_cmd = "plot \"data.txt\" i 0 u 1:2 t \"WKB\", \"data.txt\" i 1 u 1:2 t \"Airy 1\", \"data.txt\" i 2 u 1:2 t \"Ariy 2\"";
-    plot_3d_file.write_all(plot_3d_cmd.as_ref()).unwrap();
+    let plot_cmd = "plot \"data.txt\" i 0 u 1:2 t \"WKB\" w l, \"data.txt\" i 1 u 1:2 t \"Airy 1\" w l, \"data.txt\" i 2 u 1:2 t \"Ariy 2\" w l";
+    plot_file.write_all(plot_cmd.as_ref()).unwrap();
 }
 
 #[cfg(test)]

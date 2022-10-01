@@ -66,16 +66,15 @@ impl AiryWaveFunction<'_> {
     }
 }
 
-impl Func<f64, f64> for AiryWaveFunction<'_> {
-    fn eval(&self, x: f64) -> f64 {
+impl Func<f64, Complex64> for AiryWaveFunction<'_> {
+    fn eval(&self, x: f64) -> Complex64 {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
 
-        return (((std::f64::consts::PI.sqrt()
+        return ((std::f64::consts::PI.sqrt()
             / (self.u_1)
                 .abs()
                 .pow(1.0 / 6.0))
-            * Ai(complex(u_1_cube_root * (self.x_1 - x),  0.0))) as Complex64)
-            .re;
+            * Ai(complex(u_1_cube_root * (self.x_1 - x),  0.0))) as Complex64;
         // let ai = Ai(u_1_cube_root * (x - self.x_1));
         // let bi = Bi(u_1_cube_root * (x - self.x_1));
         // return ai + bi;
