@@ -27,6 +27,7 @@ impl<A, R> Func<A, R> for Function<A, R> {
     }
 }
 
+#[derive(Clone)]
 pub struct Point<T_X, T_Y> {
     pub x: T_X,
     pub y: T_Y,

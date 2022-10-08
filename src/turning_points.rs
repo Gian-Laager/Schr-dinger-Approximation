@@ -21,8 +21,8 @@ impl TGroup {
     }
 }
 
-fn validity_func(phase: Phase) -> Box<dyn Fn(f64) -> f64> {
-    Box::new(move |x: f64| {
+fn validity_func(phase: Phase) -> Arc<dyn Fn(f64) -> f64> {
+    Arc::new(move |x: f64| {
         1.0 / (2.0 * phase.mass).sqrt() * derivative(&|t| (phase.potential)(t), x).abs()
             - ((phase.potential)(x) - phase.energy).pow(2)
     })
@@ -35,7 +35,7 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
     zeros.sort_by(cmp_f64);
     let mut derivatives = zeros
         .iter()
-        .map(|x| derivative(&valid, *x))
+        .map(|x| derivative(valid.as_ref(), *x))
         .map(signum)
         .zip(zeros.clone())
         .collect::<Vec<(f64, f64)>>();
@@ -49,12 +49,12 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
             let mut missing_t = *z;
 
             while new_deriv < 0.0 {
-                missing_t = regula_falsi_bisection(&valid, guess, -ACCURACY.sqrt(), ACCURACY);
-                new_deriv = signum(derivative(&valid, missing_t));
+                missing_t = regula_falsi_bisection(valid.as_ref(), guess, -ACCURACY.sqrt(), ACCURACY);
+                new_deriv = signum(derivative(valid.as_ref(), missing_t));
                 guess -= ACCURACY.sqrt();
             }
 
-            derivatives.insert(0, (signum(derivative(&valid, missing_t)), missing_t));
+            derivatives.insert(0, (signum(derivative(valid.as_ref(), missing_t)), missing_t));
         }
     }
 
@@ -65,12 +65,12 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
             let mut missing_t = *z;
 
             while new_deriv > 0.0 {
-                missing_t = regula_falsi_bisection(&valid, guess, ACCURACY.sqrt(), ACCURACY);
-                new_deriv = signum(derivative(&valid, missing_t));
+                missing_t = regula_falsi_bisection(valid.as_ref(), guess, ACCURACY.sqrt(), ACCURACY);
+                new_deriv = signum(derivative(valid.as_ref(), missing_t));
                 guess += ACCURACY.sqrt();
             }
 
-            derivatives.push((signum(derivative(&valid, missing_t)), missing_t));
+            derivatives.push((signum(derivative(valid.as_ref(), missing_t)), missing_t));
         }
     }
 
@@ -96,8 +96,13 @@ pub fn calc_ts(phase: &Phase, view: (f64, f64)) -> TGroup {
 }
 
 fn find_zeros(phase: &Phase, view: (f64, f64)) -> Vec<f64> {
+    let phase_clone = phase.clone();
+    let validity_func = Arc::new(move |x: f64| {
+        1.0 / (2.0 * phase_clone.mass).sqrt() * derivative(&|t| (phase_clone.potential)(t), x).abs()
+            - ((phase_clone.potential)(x) - phase_clone.energy).pow(2)
+    });
     let mut zeros =
-        NewtonsMethodFindNewZero::new(validity_func(phase.clone()), ACCURACY, 1e4 as usize);
+        NewtonsMethodFindNewZero::new(validity_func, ACCURACY, 1e4 as usize);
 
     (0..MAX_TURNING_POINTS).into_iter().for_each(|_| {
         let modified_func = |x| zeros.modified_func(x);

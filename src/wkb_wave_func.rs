@@ -1,6 +1,7 @@
 use crate::*;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct WkbWaveFunction {
     pub c: f64,
     pub turning_point: f64,
@@ -39,16 +40,15 @@ impl Func<f64, Complex64> for WkbWaveFunction {
         if self.phase.energy < (self.phase.potential)(x) {
             return (self.c * 0.5 * (-integral.abs()).exp())
                 * complex(
-                    // 1.0, 0.0
-                    self.c * (self.phase.phase_off).cos(),
-                    self.c * (self.phase.phase_off).sin(),
+                    (self.phase.phase_off).cos(),
+                    (self.phase.phase_off).sin(),
                 )
-                / self.phase.momentum(x);
+                / self.phase.sqrt_momentum(x);
         } else {
             return complex(
                 self.c * (-integral.abs() + self.phase.phase_off).cos(),
                 self.c * (-integral.abs() + self.phase.phase_off).sin(),
-            ) / self.phase.momentum(x);
+            ) / self.phase.sqrt_momentum(x);
         }
     }
 }

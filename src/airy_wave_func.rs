@@ -26,9 +26,10 @@ fn Bi(x: Complex64) -> Complex64 {
         + 2.0 * Ai(x * complex(-0.5, 3.0_f64.sqrt() / 2.0)) * complex(3_f64.sqrt() / 2.0, 0.5);
 }
 
+#[derive(Clone)]
 pub struct AiryWaveFunction {
     u_1: f64,
-    x_1: f64,
+    pub turning_point: f64,
     phase: Arc<Phase>,
     pub ts: (f64, f64),
 }
@@ -56,7 +57,7 @@ impl AiryWaveFunction {
 
                 AiryWaveFunction {
                     u_1,
-                    x_1,
+                    turning_point: x_1,
                     phase: phase.clone(),
                     ts: (*t1, *t2),
                 }
@@ -71,8 +72,8 @@ impl Func<f64, Complex64> for AiryWaveFunction {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
 
         return ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
-            * Ai(complex(u_1_cube_root * (self.x_1 - x), 0.0))) as Complex64
-            * complex((self.u_1.signum() * (self.x_1 - x) + self.phase.phase_off).cos(), (self.u_1.signum() * (self.x_1 - x) + self.phase.phase_off).sin());
+            * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0))) as Complex64
+            * complex((self.u_1.signum() * (self.turning_point - x) + self.phase.phase_off).cos(), (self.u_1.signum() * (self.turning_point - x) + self.phase.phase_off).sin());
     }
 }
 

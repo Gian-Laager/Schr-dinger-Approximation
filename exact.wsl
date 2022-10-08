@@ -1,0 +1,51 @@
+c1 = -5.0
+c2 = 1.0
+numberOfPoints = 1000
+m = 1
+n = 5
+viewFactor = 1.5
+
+V[x_] := x^2
+
+energys = Solve[Integrate[Sqrt[2*m*(en - V[x])], {x, -Sqrt[en], Sqrt[en]}] == 2*Pi*(n + 1/2), en] // N
+energy = en /. energys[[1]]
+
+view = Solve[energy == V[x], x]
+view = Function[l, x /. l] /@ view
+view = Function[x, x*viewFactor] /@ view
+
+
+Print["Energy = ", energy]
+Print["view = ", view]
+
+
+solution := DSolve[{V[x] psi[x] - psi''[x]/(2 m) == energy psi[x]}, psi[x], x]
+psi[x_] = psi[x] /. solution[[1]] /. C[1] -> c1 /. C[2] -> c2
+
+Print["psi[x] = ", psi[x]]
+
+(*psi[x_] = c2*ParabolicCylinderD[(-1 - 50*Sqrt[m])/2, *)
+          (*I*2^(3/4)*m^(1/4)*x] + c1*ParabolicCylinderD[(-1 + 50*Sqrt[m])/2, *)
+          (*2^(3/4)*m^(1/4)*x]*)
+
+
+
+step = (Abs[view[[1]]] + Abs[view[[2]]]) / numberOfPoints
+
+
+vals = Table[{x, N@psi[x]}, {x, view[[1]], view[[2]], step}]
+vals = Function[p, {p[[1]], Re[p[[2]]], Im[p[[2]]]}] /@ vals
+Print["psi[0] = ", psi[0]]
+
+total = N@Integrate[Re[psi[x]]^2 + Im[psi[x]]^2, {x, -Sqrt[energy], Sqrt[energy]}]
+
+Print["area under solution = ", total]
+total = N@Integrate[Abs[psi[x]], {x, -Sqrt[energy], Sqrt[energy]}]
+Print["area under solution after renormalization = ", N@Integrate[Re[psi[x]]^2 + Im[psi[x]]^2, {x, -Sqrt[energy], Sqrt[energy]}]]
+
+vals = Function[p, {p[[1]], p[[2]] / total, p[[3]] / total}] /@ vals
+
+csv = ExportString[vals, "CSV"]
+csv = StringReplace[csv, "," -> " "]
+Export["exact.dat", csv]
+
