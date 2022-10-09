@@ -139,3 +139,5 @@ _deps
 GoImpl/bench
 
 target/
+
+output/

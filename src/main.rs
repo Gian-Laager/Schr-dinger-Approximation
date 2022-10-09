@@ -25,6 +25,7 @@ use std::f64::consts::PI;
 use std::fs::File;
 use std::io;
 use std::io::Write;
+use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 use tokio;
@@ -33,10 +34,10 @@ const INTEG_STEPS: usize = 64000;
 const TRAPEZE_PER_THREAD: usize = 1000;
 const NUMBER_OF_POINTS: usize = 100000;
 
-const PLOT_POTENTIAL: bool = true;
-const SEPARATE_FUNCTIONS: bool = true;
+const PLOT_POTENTIAL: bool = false;
+const SEPARATE_FUNCTIONS: bool = false;
 const RENORMALIZE: bool = false;
-const NORMALIZE_POTENTIAL: bool = true;
+const NORMALIZE_POTENTIAL: bool = false;
 
 const MASS: f64 = 2.0;
 const C_0: f64 = 0.18 / 0.46;
@@ -226,6 +227,10 @@ fn find_best_op(
 }
 
 fn main() {
+
+
+    let output_dir = Path::new("output");
+    std::env::set_current_dir(&output_dir).unwrap();
     let energy = energy::nth_energy(N_ENERGY, 1.0, &potential, APPROX_INF);
     println!("{} Energy: {}", N_ENERGY, energy);
 

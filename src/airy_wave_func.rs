@@ -83,6 +83,9 @@ mod test {
 
     #[test]
     fn airy_func_plot() {
+        let output_dir = Path::new("output");
+        std::env::set_current_dir(&output_dir).unwrap();
+
         let airy_ai = Function::new(|x| Ai(complex(x, 0.0)));
         let airy_bi = Function::new(|x| Bi(complex(x, 0.0)));
         let values = evaluate_function_between(&airy_ai, -10.0, 5.0, NUMBER_OF_POINTS);
