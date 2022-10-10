@@ -42,6 +42,11 @@ pub fn complex_compare(expect: Complex64, actual: Complex64, epsilon: f64) -> bo
 
 pub fn float_compare(expect: f64, actual: f64, epsilon: f64) -> bool {
     let average = (expect + actual) / 2.0;
+
+    if average < epsilon {
+        return expect == actual;    
+    }
+
     return (expect - actual) / average < epsilon;
 }
 

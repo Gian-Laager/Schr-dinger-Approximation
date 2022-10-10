@@ -110,7 +110,11 @@ impl WaveFunctionPartWithOp for ApproxPart {
     }
 
     fn with_op(&self, op: fn(Complex64) -> Complex64) -> Box<dyn WaveFunctionPartWithOp> {
-        Box::new(ApproxPart::new(self.airy.with_op(op), self.wkb.with_op(op), self.range))
+        Box::new(ApproxPart::new(
+            self.airy.with_op(op),
+            self.wkb.with_op(op),
+            self.range,
+        ))
     }
 }
 
@@ -200,7 +204,11 @@ pub fn find_best_op(
     previous: &dyn WaveFunctionPartWithOp,
     current: &dyn WaveFunctionPartWithOp,
 ) -> fn(Complex64) -> Complex64 {
-    assert!(float_compare(current.range().0, previous.range().1, 1e-7));
+    if !float_compare(current.range().0, previous.range().1, 1e-3) {
+        println!("current: ({}, {})", current.range().0, current.range().1);
+        println!("previous: ({}, {})", previous.range().0, previous.range().1);
+    }
+    assert!(float_compare(current.range().0, previous.range().1, 1e-3));
     let boundary = current.range().0;
 
     let deriv_prev = derivative(&|x| previous.eval(x), current.range().0);
@@ -283,12 +291,12 @@ impl WaveFunction {
             let center = (view.0 + view.1) / 2.0;
             let wkb1 = Box::new(PureWkb {
                 wkb: Arc::new(wkb1),
-                range: (view.0, center),
+                range: (approx_inf.0, center),
             });
 
             let wkb2 = Box::new(PureWkb {
                 wkb: Arc::new(wkb2),
-                range: (center, view.1),
+                range: (center, approx_inf.1),
             });
 
             let op =
@@ -305,9 +313,9 @@ impl WaveFunction {
             )
         } else {
             let turning_points: Vec<f64> = [
-                vec![2.0 * view.0 - boundaries.ts.first().unwrap().1],
+                vec![2.0 * approx_inf.0 - boundaries.ts.first().unwrap().1],
                 boundaries.ts.iter().map(|p| p.1).collect(),
-                vec![2.0 * view.1 - boundaries.ts.last().unwrap().1],
+                vec![2.0 * approx_inf.1 - boundaries.ts.last().unwrap().1],
             ]
             .concat();
 
@@ -418,6 +426,50 @@ impl WaveFunction {
 impl Func<f64, Complex64> for WaveFunction {
     fn eval(&self, x: f64) -> Complex64 {
         self.calc_psi(x)
+    }
+}
+
+pub struct SuperPosition {
+    wave_funcs: Vec<WaveFunction>,
+}
+
+impl SuperPosition {
+    pub fn new<F: Fn(f64) -> f64 + Send + Sync>(
+        potential: &'static F,
+        mass: f64,
+        n_energies_scaling: &[(usize, f64)],
+        approx_inf: (f64, f64),
+        view_factor: f64,
+    ) -> SuperPosition {
+        let wave_funcs = n_energies_scaling
+            .iter()
+            .map(|(e, scale)| {
+                WaveFunction::new(potential, mass, *e, approx_inf, view_factor, *scale)
+            })
+            .collect();
+        return SuperPosition { wave_funcs };
+    }
+
+    pub fn get_view(&self) -> (f64, f64) {
+        let view_a = self
+            .wave_funcs
+            .iter()
+            .map(|w| w.get_view().0)
+            .min_by(cmp_f64)
+            .unwrap();
+        let view_b = self
+            .wave_funcs
+            .iter()
+            .map(|w| w.get_view().1)
+            .max_by(cmp_f64)
+            .unwrap();
+        (view_a, view_b)
+    }
+}
+
+impl Func<f64, Complex64> for SuperPosition {
+    fn eval(&self, x: f64) -> Complex64 {
+        self.wave_funcs.iter().map(|w| w.eval(x)).sum()
     }
 }
 

@@ -50,17 +50,18 @@ fn main() {
     let output_dir = Path::new("output");
     std::env::set_current_dir(&output_dir).unwrap();
 
-    let wave_function = wave_function_builder::WaveFunction::new(
-        &potentials::square,
+    let wave_function = wave_function_builder::SuperPosition::new(
+        &potentials::mexican_hat,
         MASS,
-        N_ENERGY,
+        &[
+            (12, 1.0 / 3.0_f64.sqrt()),
+            (5, 1.0 / 3.0_f64.sqrt()),
+            (3, 1.0 / 3.0_f64.sqrt()),
+            (40, 1.0 / 3.0_f64.sqrt()),
+        ],
         APPROX_INF,
         VIEW_FACTOR,
-        1.0,
     );
-
-    println!("wkb ranges: {:#?}", wave_function.get_wkb_ranges());
-    println!("airy ranges: {:#?}", wave_function.get_airy_ranges());
 
     let all_values = evaluate_function_between(
         &wave_function,
