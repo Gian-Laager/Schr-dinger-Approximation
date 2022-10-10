@@ -77,5 +77,5 @@ pub fn double_mexican_hat(x: f64) -> f64 {
 }
 
 pub fn square(x: f64) -> f64 {
-    x*x
+    x * x
 }

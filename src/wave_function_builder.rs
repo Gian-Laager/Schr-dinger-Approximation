@@ -1,6 +1,6 @@
+use crate::wkb_wave_func::Phase;
 use crate::*;
 use std::sync::*;
-use crate::wkb_wave_func::Phase;
 
 pub trait WaveFunctionPart: Func<f64, Complex64> + Sync + Send {
     fn range(&self) -> (f64, f64);
@@ -164,10 +164,9 @@ impl Func<f64, Complex64> for ApproxPart {
             return self.airy_join_r.eval(x);
         } else if is_in_range(self.airy.ts, x) {
             return self.airy.eval(x);
-        } else if is_in_range(self.range, x) {
+        } else {
             return self.wkb.eval(x);
         }
-        panic!("invalid value for x: {}", x);
     }
 }
 pub struct WaveFunction {
@@ -178,7 +177,7 @@ pub struct WaveFunction {
     wkb_ranges: Vec<(f64, f64)>,
 }
 
-fn sign_match(mut f1: f64, mut f2: f64) -> bool {
+fn sign_match(f1: f64, f2: f64) -> bool {
     return f1.signum() == f2.signum();
 }
 
@@ -215,29 +214,21 @@ pub fn find_best_op(
     let deriv = derivative(&|x| current.eval(x), current.range().0);
     let val = current.eval(boundary);
 
-    println!(
-        "deriv: {:.17}, deriv_prev: {:.17}, val: {:.17}, val_prev: {:.17}",
-        deriv, deriv_prev, val, val_prev
-    );
     if (phase.potential)(boundary) >= phase.energy {
         *previous.get_op()
     } else if sign_match_complex(conjugate(deriv), deriv_prev)
         && sign_match_complex(conjugate(val), val_prev)
     {
-        println!("conjugate");
         conjugate
     } else if sign_match_complex(negative_conj(deriv), deriv_prev)
         && sign_match_complex(negative_conj(val), val_prev)
     {
-        println!("negative_conj");
         negative_conj
     } else if sign_match_complex(negative(deriv), deriv_prev)
         && sign_match_complex(negative(val), val_prev)
     {
-        println!("negative");
         negative
     } else {
-        println!("identiy");
         identiy
     }
 }
@@ -249,6 +240,7 @@ impl WaveFunction {
         n_energy: usize,
         approx_inf: (f64, f64),
         view_factor: f64,
+        scaling: f64,
     ) -> WaveFunction {
         let energy = energy::nth_energy(n_energy, mass, &potential, approx_inf);
 
@@ -291,8 +283,8 @@ impl WaveFunction {
             Vec<(f64, f64)>,
         ) = if boundaries.ts.len() == 0 {
             println!("No turning points found in view! Results might be in accurate");
-            let wkb1 = WkbWaveFunction::new(phase.clone(), C_0, INTEG_STEPS, APPROX_INF.0);
-            let wkb2 = WkbWaveFunction::new(phase.clone(), C_0, INTEG_STEPS, APPROX_INF.1);
+            let wkb1 = WkbWaveFunction::new(phase.clone(), scaling, INTEG_STEPS, APPROX_INF.0);
+            let wkb2 = WkbWaveFunction::new(phase.clone(), scaling, INTEG_STEPS, APPROX_INF.1);
 
             let center = (view.0 + view.1) / 2.0;
             let wkb1 = Box::new(PureWkb {
@@ -331,16 +323,8 @@ impl WaveFunction {
                 .zip(turning_points.iter().skip(2))
                 .map(
                     |((previous, boundary), next)| -> (WkbWaveFunction, (f64, f64)) {
-                        println!(
-                    "WKB between: ({:.12}, {:.12}), prev: {:.12}, current: {:.12}, next: {:.12}",
-                    (boundary + previous) / 2.0,
-                    (next + boundary) / 2.0,
-                    previous,
-                    boundary,
-                    next
-                );
                         (
-                            WkbWaveFunction::new(phase.clone(), C_0, INTEG_STEPS, *boundary),
+                            WkbWaveFunction::new(phase.clone(), scaling, INTEG_STEPS, *boundary),
                             ((boundary + previous) / 2.0, (next + boundary) / 2.0),
                         )
                     },
@@ -432,7 +416,7 @@ impl WaveFunction {
         self.view
     }
 
-    pub fn set_view(&mut self, view: (f64, f64) ) {
+    pub fn set_view(&mut self, view: (f64, f64)) {
         self.view = view
     }
 }

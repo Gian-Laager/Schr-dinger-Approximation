@@ -1,5 +1,5 @@
-use crate::Complex64;
 use crate::newtons_method::derivative;
+use crate::Complex64;
 use std::cmp::Ordering;
 
 pub fn cmp_f64(a: &f64, b: &f64) -> Ordering {

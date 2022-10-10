@@ -422,7 +422,8 @@ mod test {
                     let test_func = |x: f64| (x - a) * (x - b) * (x - c);
 
                     for guess in [a, b, c] {
-                        let mut finder = NewtonsMethodFindNewZero::new(Arc::new(test_func), 1e-15, 10000000);
+                        let mut finder =
+                            NewtonsMethodFindNewZero::new(Arc::new(test_func), 1e-15, 10000000);
 
                         finder.next_zero(1.0);
                         finder.next_zero(1.0);

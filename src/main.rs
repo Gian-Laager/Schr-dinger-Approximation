@@ -39,14 +39,12 @@ const RENORMALIZE: bool = false;
 const NORMALIZE_POTENTIAL: bool = false;
 
 const MASS: f64 = 2.0;
-const C_0: f64 = 0.18 / 0.46;
 const AIRY_EXTRA: f64 = 0.5;
 const N_ENERGY: usize = 12;
 
 const APPROX_INF: (f64, f64) = (-200.0, 200.0);
 const ENERGY_INF: f64 = 1e6;
 const VIEW_FACTOR: f64 = 1.5;
-
 
 fn main() {
     let output_dir = Path::new("output");
@@ -58,7 +56,13 @@ fn main() {
         N_ENERGY,
         APPROX_INF,
         VIEW_FACTOR,
+        1.0,
     );
+
+    wave_function
+        .get_wkb_ranges()
+        .iter()
+        .for_each(|(a, b)| println!("({}, {})", a, b));
 
     let all_values = evaluate_function_between(
         &wave_function,

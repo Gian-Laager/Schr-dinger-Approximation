@@ -1,14 +1,14 @@
-use crate::newtons_method::*;
-use num::signum;
 use crate::cmp_f64;
-use crate::*;
+use crate::newtons_method::*;
 use crate::wkb_wave_func::*;
+use crate::*;
+use num::signum;
 
 const MAX_TURNING_POINTS: usize = 256;
 const ACCURACY: f64 = 1e-9;
 
 pub struct TGroup {
-    pub ts: Vec<((f64, f64),  f64)>,
+    pub ts: Vec<((f64, f64), f64)>,
     // pub tn: Option<f64>,
 }
 
@@ -50,12 +50,16 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
             let mut missing_t = *z;
 
             while new_deriv < 0.0 {
-                missing_t = regula_falsi_bisection(valid.as_ref(), guess, -ACCURACY.sqrt(), ACCURACY);
+                missing_t =
+                    regula_falsi_bisection(valid.as_ref(), guess, -ACCURACY.sqrt(), ACCURACY);
                 new_deriv = signum(derivative(valid.as_ref(), missing_t));
                 guess -= ACCURACY.sqrt();
             }
 
-            derivatives.insert(0, (signum(derivative(valid.as_ref(), missing_t)), missing_t));
+            derivatives.insert(
+                0,
+                (signum(derivative(valid.as_ref(), missing_t)), missing_t),
+            );
         }
     }
 
@@ -66,7 +70,8 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
             let mut missing_t = *z;
 
             while new_deriv > 0.0 {
-                missing_t = regula_falsi_bisection(valid.as_ref(), guess, ACCURACY.sqrt(), ACCURACY);
+                missing_t =
+                    regula_falsi_bisection(valid.as_ref(), guess, ACCURACY.sqrt(), ACCURACY);
                 new_deriv = signum(derivative(valid.as_ref(), missing_t));
                 guess += ACCURACY.sqrt();
             }
@@ -83,7 +88,11 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
         assert!(t1_deriv > 0.0);
         assert!(t2_deriv < 0.0);
 
-        let turning_point = newtons_method(&|x| phase.energy - (phase.potential)(x), (t1 + t2) / 2.0, 1e-7);
+        let turning_point = newtons_method(
+            &|x| phase.energy - (phase.potential)(x),
+            (t1 + t2) / 2.0,
+            1e-7,
+        );
         groups.add_ts(((t1, t2), turning_point));
     }
 
@@ -102,8 +111,7 @@ fn find_zeros(phase: &Phase, view: (f64, f64)) -> Vec<f64> {
         1.0 / (2.0 * phase_clone.mass).sqrt() * derivative(&|t| (phase_clone.potential)(t), x).abs()
             - ((phase_clone.potential)(x) - phase_clone.energy).pow(2)
     });
-    let mut zeros =
-        NewtonsMethodFindNewZero::new(validity_func, ACCURACY, 1e4 as usize);
+    let mut zeros = NewtonsMethodFindNewZero::new(validity_func, ACCURACY, 1e4 as usize);
 
     (0..MAX_TURNING_POINTS).into_iter().for_each(|_| {
         let modified_func = |x| zeros.modified_func(x);
@@ -129,6 +137,4 @@ fn find_zeros(phase: &Phase, view: (f64, f64)) -> Vec<f64> {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    
 }

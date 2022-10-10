@@ -1,7 +1,7 @@
 use crate::newtons_method::newtons_method;
-use crate::wkb_wave_func::Phase;
 use crate::newtons_method::*;
 use crate::turning_points::*;
+use crate::wkb_wave_func::Phase;
 use crate::*;
 use num::signum;
 use std::sync::Arc;

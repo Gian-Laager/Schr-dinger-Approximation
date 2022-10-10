@@ -3,7 +3,11 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    Command::new("sh").arg("build.sh").current_dir("lib/").status().unwrap();
+    Command::new("sh")
+        .arg("build.sh")
+        .current_dir("lib/")
+        .status()
+        .unwrap();
 
     let path = "./lib";
     let lib = "airy";
