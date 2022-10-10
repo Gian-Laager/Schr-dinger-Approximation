@@ -7,6 +7,7 @@ pub struct WkbWaveFunction {
     pub turning_point: f64,
     pub phase: Arc<Phase>,
     integration_steps: usize,
+    op: fn(Complex64) -> Complex64
 }
 
 impl WkbWaveFunction {
@@ -21,7 +22,22 @@ impl WkbWaveFunction {
             turning_point,
             phase: phase.clone(),
             integration_steps,
+            op: identiy
         };
+    }
+
+    pub fn with_op(&self, op: fn(Complex64) -> Complex64) -> WkbWaveFunction{
+        return WkbWaveFunction {
+            c: self. c,
+            turning_point: self.turning_point,
+            phase: self.phase.clone(),
+            integration_steps: self.integration_steps,
+            op
+        };
+    }
+
+    pub fn get_op(&self) -> Box<fn(Complex64) -> Complex64> {
+        Box::new(self.op)
     }
 }
 
@@ -37,18 +53,20 @@ impl Func<f64, Complex64> for WkbWaveFunction {
             TRAPEZE_PER_THREAD,
         );
 
-        if self.phase.energy < (self.phase.potential)(x) {
-            return (self.c * 0.5 * (-integral.abs()).exp())
+        let val = if self.phase.energy < (self.phase.potential)(x) {
+            (self.c * 0.5 * (-integral.abs()).exp())
                 * complex(
                     (self.phase.phase_off).cos(),
                     (self.phase.phase_off).sin(),
                 )
-                / self.phase.sqrt_momentum(x);
+                / self.phase.sqrt_momentum(x)
         } else {
-            return complex(
+            complex(
                 self.c * (-integral.abs() + self.phase.phase_off).cos(),
                 self.c * (-integral.abs() + self.phase.phase_off).sin(),
-            ) / self.phase.sqrt_momentum(x);
-        }
+            ) / self.phase.sqrt_momentum(x)
+        };
+
+        return (self.op)(val);
     }
 }

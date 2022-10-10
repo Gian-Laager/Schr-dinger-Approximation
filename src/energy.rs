@@ -45,7 +45,6 @@ impl<F: Fn(f64) -> f64 + Sync> Func<f64, f64> for SommerfeldCond<'_, F> {
     }
 }
 
-
 pub fn nth_energy<F: Fn(f64) -> f64 + Sync>(n: usize, mass: f64, pot: &F, view: (f64, f64)) -> f64 {
     const ENERGY_STEP: f64 = 10.0;
     const CHECKS_PER_ENERGY_STEP: usize = INTEG_STEPS;

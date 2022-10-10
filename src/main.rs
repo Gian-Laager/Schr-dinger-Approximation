@@ -1,4 +1,5 @@
 #![feature(unboxed_closures)]
+#![feature(trait_upcasting)]
 
 mod airy;
 mod airy_wave_func;
@@ -15,6 +16,7 @@ use crate::airy::airy_ai;
 use crate::airy_wave_func::AiryWaveFunction;
 use crate::integrals::*;
 use crate::newtons_method::derivative;
+use crate::wave_function_builder::*;
 use crate::utils::*;
 use crate::wkb_wave_func::WkbWaveFunction;
 use num::complex::Complex64;
@@ -104,7 +106,7 @@ impl Func<f64, f64> for Phase {
 }
 
 fn potential(x: f64) -> f64 {
-    potentials::mexican_hat(x)
+    potentials::square(x)
 }
 
 fn order_ts((t1, t2): &(f64, f64)) -> (f64, f64) {
@@ -143,21 +145,6 @@ fn ask_user_for_view(lower_bound: Option<f64>, upper_bound: Option<f64>) -> (f64
     return get_user_bounds();
 }
 
-fn identiy(c: Complex64) -> Complex64 {
-    c
-}
-
-fn conjugate(c: Complex64) -> Complex64 {
-    c.conj()
-}
-
-fn negative(c: Complex64) -> Complex64 {
-    -c
-}
-
-fn negative_conj(c: Complex64) -> Complex64 {
-    -c.conj()
-}
 
 fn sign_match(mut f1: f64, mut f2: f64) -> bool {
     return f1.signum() == f2.signum();
@@ -183,7 +170,7 @@ fn sign_match_complex(mut c1: Complex64, mut c2: Complex64) -> bool {
     return sign_match(c1.re, c2.re) && sign_match(c1.im, c2.im);
 }
 
-fn find_best_op(
+pub fn find_best_op(
     phase: Arc<Phase>,
     wkb: &WkbWaveFunction,
     boundary: f64,
@@ -225,6 +212,7 @@ fn find_best_op(
         identiy
     }
 }
+
 
 fn main() {
 
@@ -284,12 +272,11 @@ fn main() {
         (
             vec![
                 (
-                    wkb1,
+                    wkb1.with_op(identiy),
                     (view.0, center),
                     None,
-                    identiy as fn(Complex64) -> Complex64,
                 ),
-                (wkb2, (center, view.1), None, op),
+                (wkb2.with_op(op), (center, view.1), None),
             ],
             vec![],
         )
@@ -314,7 +301,6 @@ fn main() {
                     WkbWaveFunction,
                     (f64, f64),
                     Option<AiryWaveFunction>,
-                    fn(Complex64) -> Complex64,
                 ) {
                     let wkb = WkbWaveFunction::new(phase.clone(), C_0, INTEG_STEPS, *boundary);
                     let op: fn(Complex64) -> Complex64 = if is_first {
@@ -325,10 +311,9 @@ fn main() {
                     };
                     previous_op = op;
                     (
-                        wkb,
+                        wkb.with_op(op),
                         ((boundary + previous) / 2.0, (next + boundary) / 2.0),
-                        Some(airy_wave_func),
-                        op,
+                        Some(airy_wave_func.with_op(op)),
                     )
                 },
             )
@@ -336,7 +321,6 @@ fn main() {
                 WkbWaveFunction,
                 (f64, f64),
                 Option<AiryWaveFunction>,
-                fn(Complex64) -> Complex64,
             )>>();
 
         (wave_funcs, turning_point_boundaries)
@@ -344,11 +328,8 @@ fn main() {
 
     let values = wave_funcs
         .par_iter()
-        .map(|(w, (a, b), _, op)| {
+        .map(|(w, (a, b), _)| {
             evaluate_function_between(w, *a, *b, NUMBER_OF_POINTS)
-                .iter()
-                .map(|p| Point { x: p.x, y: op(p.y) })
-                .collect::<Vec<Point<f64, Complex64>>>()
         })
         .flatten()
         .filter(|p| {
@@ -368,8 +349,8 @@ fn main() {
 
     let airy_values = wave_funcs
         .iter()
-        .filter(|(_, _, airy_wave_func, _)| airy_wave_func.is_some())
-        .map(|(wkb, _, airy_wave_func, op)| {
+        .filter(|(_, _, airy_wave_func)| airy_wave_func.is_some())
+        .map(|(wkb, _, airy_wave_func)| {
             let distance =
                 airy_wave_func.as_ref().unwrap().ts.1 - airy_wave_func.as_ref().unwrap().ts.0;
 
@@ -412,9 +393,6 @@ fn main() {
                 [joint_vals_l, airy_values, joint_vals_r].concat();
 
             airy_values
-                .par_iter()
-                .map(|p| Point { x: p.x, y: op(p.y) })
-                .collect::<Vec<Point<f64, Complex64>>>()
         })
         .collect::<Vec<Vec<Point<f64, Complex64>>>>();
 
