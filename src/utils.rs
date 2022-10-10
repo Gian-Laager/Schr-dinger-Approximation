@@ -1,4 +1,5 @@
 use crate::Complex64;
+use crate::newtons_method::derivative;
 use std::cmp::Ordering;
 
 pub fn cmp_f64(a: &f64, b: &f64) -> Ordering {
@@ -42,4 +43,37 @@ pub fn complex_compare(expect: Complex64, actual: Complex64, epsilon: f64) -> bo
 pub fn float_compare(expect: f64, actual: f64, epsilon: f64) -> bool {
     let average = (expect + actual) / 2.0;
     return (expect - actual) / average < epsilon;
+}
+
+pub trait Func<A, R>: Sync + Send {
+    fn eval(&self, x: A) -> R;
+}
+
+pub trait ReToC: Sync + Func<f64, Complex64> {}
+
+pub trait ReToRe: Sync + Func<f64, f64> {}
+
+pub struct Function<A, R> {
+    pub(crate) f: fn(A) -> R,
+}
+
+impl<A, R> Function<A, R> {
+    pub const fn new(f: fn(A) -> R) -> Function<A, R> {
+        return Function { f };
+    }
+}
+
+impl<A, R> Func<A, R> for Function<A, R> {
+    fn eval(&self, x: A) -> R {
+        (self.f)(x)
+    }
+}
+pub struct Derivative<'a> {
+    f: &'a dyn Func<f64, Complex64>,
+}
+
+impl Func<f64, Complex64> for Derivative<'_> {
+    fn eval(&self, x: f64) -> Complex64 {
+        derivative(&|x| self.f.eval(x), x)
+    }
 }

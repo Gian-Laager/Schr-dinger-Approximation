@@ -2,6 +2,7 @@ use crate::newtons_method::*;
 use num::signum;
 use crate::cmp_f64;
 use crate::*;
+use crate::wkb_wave_func::*;
 
 const MAX_TURNING_POINTS: usize = 256;
 const ACCURACY: f64 = 1e-9;

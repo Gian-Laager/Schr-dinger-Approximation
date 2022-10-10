@@ -1,8 +1,6 @@
 use crate::*;
-use std::rc::*;
 use std::sync::*;
-
-const AIRY_JOINT_WIDTH_PERCENT: f64 = 0.2;
+use crate::wkb_wave_func::Phase;
 
 pub trait WaveFunctionPart: Func<f64, Complex64> + Sync + Send {
     fn range(&self) -> (f64, f64);
@@ -11,6 +9,7 @@ pub trait WaveFunctionPart: Func<f64, Complex64> + Sync + Send {
 pub trait WaveFunctionPartWithOp: WaveFunctionPart {
     fn get_op(&self) -> Box<fn(Complex64) -> Complex64>;
     fn with_op(&self, op: fn(Complex64) -> Complex64) -> Box<dyn WaveFunctionPartWithOp>;
+    fn as_wave_function_part(&self) -> Box<dyn WaveFunctionPart>;
 }
 
 pub fn is_in_range(range: (f64, f64), x: f64) -> bool {
@@ -51,6 +50,7 @@ impl Func<f64, Complex64> for Joint {
     }
 }
 
+#[derive(Clone)]
 struct PureWkb {
     wkb: Arc<WkbWaveFunction>,
     range: (f64, f64),
@@ -63,6 +63,9 @@ impl WaveFunctionPart for PureWkb {
 }
 
 impl WaveFunctionPartWithOp for PureWkb {
+    fn as_wave_function_part(&self) -> Box<dyn WaveFunctionPart> {
+        Box::new(self.clone())
+    }
 
     fn get_op(&self) -> Box<fn(Complex64) -> Complex64> {
         self.wkb.get_op()
@@ -82,6 +85,7 @@ impl Func<f64, Complex64> for PureWkb {
     }
 }
 
+#[derive(Clone)]
 struct ApproxPart {
     airy: Arc<AiryWaveFunction>,
     wkb: Arc<WkbWaveFunction>,
@@ -97,6 +101,10 @@ impl WaveFunctionPart for ApproxPart {
 }
 
 impl WaveFunctionPartWithOp for ApproxPart {
+    fn as_wave_function_part(&self) -> Box<dyn WaveFunctionPart> {
+        Box::new(self.clone())
+    }
+
     fn get_op(&self) -> Box<fn(Complex64) -> Complex64> {
         self.wkb.get_op()
     }
@@ -116,7 +124,7 @@ impl ApproxPart {
     fn new(airy: AiryWaveFunction, wkb: WkbWaveFunction, range: (f64, f64)) -> ApproxPart {
         let airy_rc = Arc::new(airy);
         let wkb_rc = Arc::new(wkb);
-        let delta = (airy_rc.ts.1 - airy_rc.ts.0) * AIRY_JOINT_WIDTH_PERCENT;
+        let delta = (airy_rc.ts.1 - airy_rc.ts.0) * AIRY_EXTRA;
         ApproxPart {
             airy: airy_rc.clone(),
             wkb: wkb_rc.clone(),
@@ -135,6 +143,17 @@ impl ApproxPart {
             range,
         }
     }
+
+    pub fn is_airy(&self, x: f64) -> bool {
+        if is_in_range(self.airy_join_l.range(), x) {
+            return true;
+        } else if is_in_range(self.airy_join_r.range(), x) {
+            return true;
+        } else if is_in_range(self.airy.ts, x) {
+            return true;
+        }
+        return false;
+    }
 }
 
 impl Func<f64, Complex64> for ApproxPart {
@@ -151,10 +170,36 @@ impl Func<f64, Complex64> for ApproxPart {
         panic!("invalid value for x: {}", x);
     }
 }
-struct WaveFunction {
+pub struct WaveFunction {
     phase: Arc<Phase>,
     view: (f64, f64),
     parts: Vec<Arc<dyn WaveFunctionPart>>,
+    airy_ranges: Vec<(f64, f64)>,
+    wkb_ranges: Vec<(f64, f64)>,
+}
+
+fn sign_match(mut f1: f64, mut f2: f64) -> bool {
+    return f1.signum() == f2.signum();
+}
+
+fn sign_match_complex(mut c1: Complex64, mut c2: Complex64) -> bool {
+    if c1.re.abs() < c1.im.abs() {
+        c1.re = 0.0;
+    }
+
+    if c1.im.abs() < c1.re.abs() {
+        c1.im = 0.0;
+    }
+
+    if c2.re.abs() < c2.im.abs() {
+        c2.re = 0.0;
+    }
+
+    if c2.im.abs() < c2.re.abs() {
+        c2.im = 0.0;
+    }
+
+    return sign_match(c1.re, c2.re) && sign_match(c1.im, c2.im);
 }
 
 pub fn find_best_op(
@@ -198,7 +243,7 @@ pub fn find_best_op(
 }
 
 impl WaveFunction {
-    fn new<F: Fn(f64) -> f64 + Sync + Send>(
+    pub fn new<F: Fn(f64) -> f64 + Sync + Send>(
         potential: &'static F,
         mass: f64,
         n_energy: usize,
@@ -240,7 +285,11 @@ impl WaveFunction {
         let phase = Arc::new(phase);
 
         let (airy_wave_funcs, boundaries) = AiryWaveFunction::new(phase.clone(), (view.0, view.1));
-        let parts: Vec<Arc<dyn WaveFunctionPartWithOp>> = if boundaries.ts.len() == 0 {
+        let (parts, airy_ranges, wkb_ranges): (
+            Vec<Arc<dyn WaveFunctionPartWithOp>>,
+            Vec<(f64, f64)>,
+            Vec<(f64, f64)>,
+        ) = if boundaries.ts.len() == 0 {
             println!("No turning points found in view! Results might be in accurate");
             let wkb1 = WkbWaveFunction::new(phase.clone(), C_0, INTEG_STEPS, APPROX_INF.0);
             let wkb2 = WkbWaveFunction::new(phase.clone(), C_0, INTEG_STEPS, APPROX_INF.1);
@@ -259,7 +308,15 @@ impl WaveFunction {
             let op =
                 wave_function_builder::find_best_op(phase.clone(), wkb1.as_ref(), wkb2.as_ref());
 
-            vec![Arc::from(wkb1 as Box<dyn WaveFunctionPartWithOp>), Arc::from(wkb2.with_op(op))]
+            let wkb1_range = wkb1.range();
+            (
+                vec![
+                    Arc::from(wkb1 as Box<dyn WaveFunctionPartWithOp>),
+                    Arc::from(wkb2.with_op(op)),
+                ],
+                vec![],
+                vec![wkb1_range, wkb2.range()],
+            )
         } else {
             let turning_points: Vec<f64> = [
                 vec![2.0 * view.0 - boundaries.ts.first().unwrap().1],
@@ -296,6 +353,12 @@ impl WaveFunction {
                 .map(|(w, a)| (w, a.clone()))
                 .collect();
 
+            let wkb_ranges = wkb_airy_pair
+                .iter()
+                .map(|((_, wkb_range), _)| *wkb_range)
+                .collect();
+            let airy_ranges = wkb_airy_pair.iter().map(|(_, airy)| airy.ts).collect();
+
             let approx_parts: Vec<Arc<dyn WaveFunctionPartWithOp>> = wkb_airy_pair
                 .iter()
                 .map(|((wkb, range), airy)| -> Arc<dyn WaveFunctionPartWithOp> {
@@ -303,7 +366,8 @@ impl WaveFunction {
                 })
                 .collect();
 
-            let mut approx_parts_with_op = vec![Arc::from(approx_parts.first().unwrap().with_op(identiy))];
+            let mut approx_parts_with_op =
+                vec![Arc::from(approx_parts.first().unwrap().with_op(identiy))];
             approx_parts_with_op.reserve(approx_parts.len() - 1);
 
             for i in 0..(approx_parts.len() - 1) {
@@ -314,15 +378,20 @@ impl WaveFunction {
                 approx_parts_with_op.push(Arc::from(p2_with_op));
             }
 
-            approx_parts_with_op
+            (approx_parts_with_op, airy_ranges, wkb_ranges)
         };
 
-        let parts = parts.iter().map(|p| p.clone() as Arc<dyn WaveFunctionPart>).collect();
+        let parts = parts
+            .iter()
+            .map(|p| Arc::from(p.as_wave_function_part()))
+            .collect();
 
         return WaveFunction {
             phase,
             view,
-            parts
+            parts,
+            airy_ranges,
+            wkb_ranges,
         };
     }
 
@@ -333,5 +402,71 @@ impl WaveFunction {
             }
         }
         panic!("[WkbWaveFunction::calc_psi] x out of range");
+    }
+
+    pub fn get_airy_ranges(&self) -> &[(f64, f64)] {
+        self.airy_ranges.as_slice()
+    }
+
+    pub fn get_wkb_ranges(&self) -> &[(f64, f64)] {
+        self.wkb_ranges.as_slice()
+    }
+
+    pub fn is_wkb(&self, x: f64) -> bool {
+        self.wkb_ranges
+            .iter()
+            .map(|r| is_in_range(*r, x))
+            .collect::<Vec<bool>>()
+            .contains(&true)
+    }
+
+    pub fn is_airy(&self, x: f64) -> bool {
+        self.airy_ranges
+            .iter()
+            .map(|r| is_in_range(*r, x))
+            .collect::<Vec<bool>>()
+            .contains(&true)
+    }
+
+    pub fn get_view(&self) -> (f64, f64) {
+        self.view
+    }
+
+    pub fn set_view(&mut self, view: (f64, f64) ) {
+        self.view = view
+    }
+}
+
+impl Func<f64, Complex64> for WaveFunction {
+    fn eval(&self, x: f64) -> Complex64 {
+        self.calc_psi(x)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn sign_check_complex_test() {
+        let range = (-50.0, 50.0);
+        let n = 100000;
+        for ri1 in 0..n {
+            for ii1 in 0..n {
+                for ri2 in 0..n {
+                    for ii2 in 0..n {
+                        let re1 = index_to_range(ri1 as f64, 0.0, n as f64, range.0, range.1);
+                        let im1 = index_to_range(ii1 as f64, 0.0, n as f64, range.0, range.1);
+                        let re2 = index_to_range(ri2 as f64, 0.0, n as f64, range.0, range.1);
+                        let im2 = index_to_range(ii2 as f64, 0.0, n as f64, range.0, range.1);
+
+                        assert_eq!(
+                            sign_match_complex(complex(re1, im1), complex(re2, im2)),
+                            sign_match_complex(complex(re2, im2), complex(re1, im1))
+                        );
+                    }
+                }
+            }
+        }
     }
 }

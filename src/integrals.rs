@@ -1,31 +1,5 @@
-use crate::utils::*;
-use crate::Complex64;
 use crate::*;
 use rayon::prelude::*;
-
-pub trait Func<A, R>: Sync + Send{
-    fn eval(&self, x: A) -> R;
-}
-
-pub trait ReToC: Sync + Func<f64, Complex64> {}
-
-pub trait ReToRe: Sync + Func<f64, f64> {}
-
-pub struct Function<A, R> {
-    pub(crate) f: fn(A) -> R,
-}
-
-impl<A, R> Function<A, R> {
-    pub const fn new(f: fn(A) -> R) -> Function<A, R> {
-        return Function { f };
-    }
-}
-
-impl<A, R> Func<A, R> for Function<A, R> {
-    fn eval(&self, x: A) -> R {
-        (self.f)(x)
-    }
-}
 
 #[derive(Clone)]
 pub struct Point<T_X, T_Y> {
@@ -142,11 +116,6 @@ mod test {
         return complex(b * b * b / 3.0 - a * a * a / 3.0, 0.0);
     }
 
-    fn float_compare(expect: Complex64, actual: Complex64, epsilon: f64) -> bool {
-        let average = (expect.norm() + actual.norm()) / 2.0;
-        return (expect - actual).norm() / average < epsilon;
-    }
-
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_square() {
         let square_func: Function<f64, Complex64> = Function::new(square);
@@ -167,7 +136,7 @@ mod test {
                 }
 
                 let epsilon = 0.00001;
-                assert!(float_compare(
+                assert!(complex_compare(
                     integrate(
                         evaluate_function_between(&square_func, a, b, INTEG_STEPS),
                         TRAPEZE_PER_THREAD,
@@ -241,7 +210,7 @@ mod test {
                     continue;
                 }
                 let epsilon = 0.0001;
-                assert!(float_compare(
+                assert!(complex_compare(
                     integrate(
                         evaluate_function_between(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS),
                         TRAPEZE_PER_THREAD,

@@ -1,16 +1,9 @@
 use crate::newtons_method::newtons_method;
-use crate::newtons_method::newtons_method_max_iters;
-use crate::newtons_method::{
-    derivative, make_guess, newtons_method_find_new_zero, regula_falsi_bisection,
-    regula_falsi_method, NewtonsMethodFindNewZero,
-};
+use crate::wkb_wave_func::Phase;
+use crate::newtons_method::*;
 use crate::turning_points::*;
-use crate::utils::cmp_f64;
 use crate::*;
-use num::integer::sqrt;
-use num::{signum, zero};
-use scilib::constant::H;
-use std::cmp::{min, Ordering};
+use num::signum;
 use std::sync::Arc;
 
 fn Ai(x: Complex64) -> Complex64 {
