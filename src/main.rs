@@ -59,10 +59,8 @@ fn main() {
         1.0,
     );
 
-    wave_function
-        .get_wkb_ranges()
-        .iter()
-        .for_each(|(a, b)| println!("({}, {})", a, b));
+    println!("wkb ranges: {:#?}", wave_function.get_wkb_ranges());
+    println!("airy ranges: {:#?}", wave_function.get_airy_ranges());
 
     let all_values = evaluate_function_between(
         &wave_function,

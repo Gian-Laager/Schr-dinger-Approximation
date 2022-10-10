@@ -38,15 +38,15 @@ impl Func<f64, Complex64> for Joint {
     fn eval(&self, x: f64) -> Complex64 {
         // self.left.eval(x)
         //     + (self.right.eval(x) - self.left.eval(x)) * sigmoid((x - self.cut) / self.delta)
-        let (left, right) = if self.delta > 0.0 {
+        let (left, right) = if self.delta < 0.0 {
             (&self.left, &self.right)
         } else {
             (&self.right, &self.left)
         };
 
-        left.eval(x) * f64::sin((x - self.cut) / (-self.delta) * f64::consts::PI / 2.0).powi(2)
+        left.eval(x) * f64::sin((x - self.cut) / (self.delta) * f64::consts::PI / 2.0).powi(2)
             + right.eval(x)
-                * f64::cos((x - self.cut) / (-self.delta) * f64::consts::PI / 2.0).powi(2)
+                * f64::cos((x - self.cut) / (self.delta) * f64::consts::PI / 2.0).powi(2)
     }
 }
 
@@ -110,13 +110,7 @@ impl WaveFunctionPartWithOp for ApproxPart {
     }
 
     fn with_op(&self, op: fn(Complex64) -> Complex64) -> Box<dyn WaveFunctionPartWithOp> {
-        Box::new(ApproxPart {
-            airy: Arc::new(self.airy.with_op(op)),
-            wkb: Arc::new(self.wkb.with_op(op)),
-            airy_join_l: self.airy_join_l.clone(),
-            airy_join_r: self.airy_join_r.clone(),
-            range: self.range,
-        })
+        Box::new(ApproxPart::new(self.airy.with_op(op), self.wkb.with_op(op), self.range))
     }
 }
 
@@ -131,13 +125,13 @@ impl ApproxPart {
             airy_join_l: Joint {
                 left: wkb_rc.clone(),
                 right: airy_rc.clone(),
-                cut: airy_rc.ts.0,
-                delta,
+                cut: airy_rc.ts.0 + delta / 2.0,
+                delta: -delta,
             },
             airy_join_r: Joint {
                 left: airy_rc.clone(),
                 right: wkb_rc.clone(),
-                cut: airy_rc.ts.1,
+                cut: airy_rc.ts.1 - delta / 2.0,
                 delta,
             },
             range,
