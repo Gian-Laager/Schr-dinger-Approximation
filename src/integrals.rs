@@ -112,7 +112,7 @@ mod test {
         return complex(x * x, 0.0);
     }
 
-    fn square_itegral(a: f64, b: f64) -> Complex64 {
+    fn square_integral(a: f64, b: f64) -> Complex64 {
         return complex(b * b * b / 3.0 - a * a * a / 3.0, 0.0);
     }
 
@@ -141,7 +141,7 @@ mod test {
                         evaluate_function_between(&square_func, a, b, INTEG_STEPS),
                         TRAPEZE_PER_THREAD,
                     ),
-                    square_itegral(a, b),
+                    square_integral(a, b),
                     epsilon,
                 ));
             }

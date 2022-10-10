@@ -294,7 +294,7 @@ impl<F: Fn(f64) -> f64 + ?Sized + Clone> NewtonsMethodFindNewZero<F> {
     }
 }
 
-pub fn make_guess<F>(f: &F, (start, end): (f64, f64), n: usize) -> Option<f64>
+pub fn make_guess<F>(f: &F, (start, end): (f64, f64), n: usize) -> Vec<f64>
 where
     F: Fn(f64) -> f64 + Sync,
 {
@@ -309,7 +309,7 @@ where
         .map(|(x, y)| (x, y.abs()))
         .collect();
     points.sort_by(sort_func);
-    points.get(0).map(|point| point.0)
+    points.iter().map(|point| point.0).collect()
 }
 
 pub fn newtons_method_find_new_zero<F>(
@@ -457,7 +457,7 @@ mod test {
 
         for i in 0..4 {
             let guess = make_guess(&|x| finder.modified_func(x), interval, 1000);
-            finder.next_zero(guess.unwrap());
+            finder.next_zero(*guess.get(0).unwrap());
         }
 
         let mut zeros = finder.get_previous_zeros().clone();

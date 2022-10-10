@@ -54,13 +54,13 @@ fn main() {
         &potentials::mexican_hat,
         MASS,
         &[
-            (12, 1.0 / 3.0_f64.sqrt()),
-            (5, 1.0 / 3.0_f64.sqrt()),
-            (3, 1.0 / 3.0_f64.sqrt()),
-            (40, 1.0 / 3.0_f64.sqrt()),
+            (37, complex(1.0, 0.0)),
+            (38, complex(1.0, 0.0)),
+            (39, complex(1.0, 0.0)),
         ],
         APPROX_INF,
         VIEW_FACTOR,
+        ScalingType::Renormalize(complex(1.0, 0.0)),
     );
 
     let all_values = evaluate_function_between(

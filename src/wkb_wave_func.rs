@@ -1,4 +1,5 @@
 use crate::*;
+use std::fmt::Display;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -7,6 +8,16 @@ pub struct Phase {
     pub mass: f64,
     pub potential: Arc<dyn Fn(f64) -> f64 + Send + Sync>,
     pub phase_off: f64,
+}
+
+impl Display for Phase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Phase {{energy: {}, mass: {}, potential: [func], phase_off: {}}}",
+            self.energy, self.mass, self.phase_off
+        )
+    }
 }
 
 impl Phase {
@@ -67,7 +78,7 @@ impl WkbWaveFunction {
             turning_point,
             phase: phase.clone(),
             integration_steps,
-            op: identiy,
+            op: identity,
         };
     }
 

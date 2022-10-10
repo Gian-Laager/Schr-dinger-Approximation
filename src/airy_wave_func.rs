@@ -58,7 +58,7 @@ impl AiryWaveFunction {
                     turning_point: x_1,
                     phase: phase.clone(),
                     ts: (*t1, *t2),
-                    op: identiy,
+                    op: identity,
                 }
             })
             .collect::<Vec<AiryWaveFunction>>();

@@ -25,7 +25,7 @@ fn get_user_bounds() -> (f64, f64) {
 }
 fn ask_user_for_view(lower_bound: Option<f64>, upper_bound: Option<f64>) -> (f64, f64) {
     println!("Failed to determine boundary of the graph automatically.");
-    println!("Pleas enter values manualy.");
+    println!("Pleas enter values manually.");
     lower_bound.map(|b| println!("(Suggestion for lower bound: {})", b));
     upper_bound.map(|b| println!("(Suggestion for upper bound: {})", b));
 

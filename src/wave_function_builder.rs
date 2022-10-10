@@ -2,6 +2,12 @@ use crate::wkb_wave_func::Phase;
 use crate::*;
 use std::sync::*;
 
+pub enum ScalingType {
+    Mul(Complex64),
+    Renormalize(Complex64),
+    None,
+}
+
 pub trait WaveFunctionPart: Func<f64, Complex64> + Sync + Send {
     fn range(&self) -> (f64, f64);
 }
@@ -167,12 +173,15 @@ impl Func<f64, Complex64> for ApproxPart {
         }
     }
 }
+
+#[derive(Clone)]
 pub struct WaveFunction {
     phase: Arc<Phase>,
     view: (f64, f64),
     parts: Vec<Arc<dyn WaveFunctionPart>>,
     airy_ranges: Vec<(f64, f64)>,
     wkb_ranges: Vec<(f64, f64)>,
+    scaling: Complex64,
 }
 
 fn sign_match(f1: f64, f2: f64) -> bool {
@@ -231,7 +240,7 @@ pub fn find_best_op(
     {
         negative
     } else {
-        identiy
+        identity
     }
 }
 
@@ -242,7 +251,7 @@ impl WaveFunction {
         n_energy: usize,
         approx_inf: (f64, f64),
         view_factor: f64,
-        scaling: f64,
+        scaling: ScalingType,
     ) -> WaveFunction {
         let energy = energy::nth_energy(n_energy, mass, &potential, approx_inf);
 
@@ -265,12 +274,13 @@ impl WaveFunction {
                 upper_bound.unwrap() * view_factor,
             )
         } else {
-            println!("Failed to determine view automaticaly, using APPROX_INF as view");
+            println!("Failed to determine view automatically, using APPROX_INF as view");
             approx_inf.clone()
         };
 
         let mut phase = Phase::new(energy, MASS, potential, f64::consts::PI / 4.0);
-        let (_, t_boundaries) = AiryWaveFunction::new(Arc::new(phase.clone()), (view.0, view.1));
+        let (_, t_boundaries) =
+            AiryWaveFunction::new(Arc::new(phase.clone()), (approx_inf.0, approx_inf.1));
         if t_boundaries.ts.len() != 0 {
             // conjecture based on observations in all the plots
             phase.phase_off =
@@ -285,8 +295,8 @@ impl WaveFunction {
             Vec<(f64, f64)>,
         ) = if boundaries.ts.len() == 0 {
             println!("No turning points found in view! Results might be in accurate");
-            let wkb1 = WkbWaveFunction::new(phase.clone(), scaling, INTEG_STEPS, APPROX_INF.0);
-            let wkb2 = WkbWaveFunction::new(phase.clone(), scaling, INTEG_STEPS, APPROX_INF.1);
+            let wkb1 = WkbWaveFunction::new(phase.clone(), 1.0, INTEG_STEPS, APPROX_INF.0);
+            let wkb2 = WkbWaveFunction::new(phase.clone(), 1.0, INTEG_STEPS, APPROX_INF.1);
 
             let center = (view.0 + view.1) / 2.0;
             let wkb1 = Box::new(PureWkb {
@@ -299,8 +309,7 @@ impl WaveFunction {
                 range: (center, approx_inf.1),
             });
 
-            let op =
-                wave_function_builder::find_best_op(phase.clone(), wkb1.as_ref(), wkb2.as_ref());
+            let op = find_best_op(phase.clone(), wkb1.as_ref(), wkb2.as_ref());
 
             let wkb1_range = wkb1.range();
             (
@@ -326,7 +335,7 @@ impl WaveFunction {
                 .map(
                     |((previous, boundary), next)| -> (WkbWaveFunction, (f64, f64)) {
                         (
-                            WkbWaveFunction::new(phase.clone(), scaling, INTEG_STEPS, *boundary),
+                            WkbWaveFunction::new(phase.clone(), 1.0, INTEG_STEPS, *boundary),
                             ((boundary + previous) / 2.0, (next + boundary) / 2.0),
                         )
                     },
@@ -353,7 +362,7 @@ impl WaveFunction {
                 .collect();
 
             let mut approx_parts_with_op =
-                vec![Arc::from(approx_parts.first().unwrap().with_op(identiy))];
+                vec![Arc::from(approx_parts.first().unwrap().with_op(identity))];
             approx_parts_with_op.reserve(approx_parts.len() - 1);
 
             for i in 0..(approx_parts.len() - 1) {
@@ -372,13 +381,43 @@ impl WaveFunction {
             .map(|p| Arc::from(p.as_wave_function_part()))
             .collect();
 
-        return WaveFunction {
-            phase,
-            view,
-            parts,
-            airy_ranges,
-            wkb_ranges,
-        };
+        match scaling {
+            ScalingType::Mul(s) => WaveFunction {
+                phase,
+                view,
+                parts,
+                airy_ranges,
+                wkb_ranges,
+                scaling: s,
+            },
+            ScalingType::None => WaveFunction {
+                phase,
+                view,
+                parts,
+                airy_ranges,
+                wkb_ranges,
+                scaling: complex(1.0, 0.0),
+            },
+            ScalingType::Renormalize(s) => {
+                let unscaled = WaveFunction {
+                    phase: phase.clone(),
+                    view,
+                    parts: parts.clone(),
+                    airy_ranges: airy_ranges.clone(),
+                    wkb_ranges: wkb_ranges.clone(),
+                    scaling: s,
+                };
+                let factor = renormalize_factor(&unscaled, approx_inf);
+                WaveFunction {
+                    phase,
+                    view,
+                    parts,
+                    airy_ranges,
+                    wkb_ranges,
+                    scaling: s * factor,
+                }
+            }
+        }
     }
 
     pub fn calc_psi(&self, x: f64) -> Complex64 {
@@ -387,7 +426,14 @@ impl WaveFunction {
                 return part.eval(x);
             }
         }
-        panic!("[WkbWaveFunction::calc_psi] x out of range");
+        panic!(
+            "[WkbWaveFunction::calc_psi] x out of range (x = {}, ranges: {:#?})",
+            x,
+            self.parts
+                .iter()
+                .map(|p| p.range())
+                .collect::<Vec<(f64, f64)>>()
+        );
     }
 
     pub fn get_airy_ranges(&self) -> &[(f64, f64)] {
@@ -425,29 +471,59 @@ impl WaveFunction {
 
 impl Func<f64, Complex64> for WaveFunction {
     fn eval(&self, x: f64) -> Complex64 {
-        self.calc_psi(x)
+        self.scaling * self.calc_psi(x)
     }
 }
 
 pub struct SuperPosition {
     wave_funcs: Vec<WaveFunction>,
+    scaling: Complex64,
 }
 
 impl SuperPosition {
     pub fn new<F: Fn(f64) -> f64 + Send + Sync>(
         potential: &'static F,
         mass: f64,
-        n_energies_scaling: &[(usize, f64)],
+        n_energies_scaling: &[(usize, Complex64)],
         approx_inf: (f64, f64),
         view_factor: f64,
+        scaling: ScalingType,
     ) -> SuperPosition {
         let wave_funcs = n_energies_scaling
             .iter()
             .map(|(e, scale)| {
-                WaveFunction::new(potential, mass, *e, approx_inf, view_factor, *scale)
+                WaveFunction::new(
+                    potential,
+                    mass,
+                    *e,
+                    approx_inf,
+                    view_factor,
+                    ScalingType::Mul(*scale),
+                )
             })
             .collect();
-        return SuperPosition { wave_funcs };
+
+        match scaling {
+            ScalingType::Mul(s) => SuperPosition {
+                wave_funcs,
+                scaling: s,
+            },
+            ScalingType::None => SuperPosition {
+                wave_funcs,
+                scaling: 1.0.into(),
+            },
+            ScalingType::Renormalize(s) => {
+                let unscaled = SuperPosition {
+                    wave_funcs: wave_funcs.clone(),
+                    scaling: s,
+                };
+                let factor = renormalize_factor(&unscaled, approx_inf);
+                SuperPosition {
+                    wave_funcs,
+                    scaling: s * factor,
+                }
+            }
+        }
     }
 
     pub fn get_view(&self) -> (f64, f64) {
@@ -469,8 +545,54 @@ impl SuperPosition {
 
 impl Func<f64, Complex64> for SuperPosition {
     fn eval(&self, x: f64) -> Complex64 {
-        self.wave_funcs.iter().map(|w| w.eval(x)).sum()
+        self.scaling * self.wave_funcs.iter().map(|w| w.eval(x)).sum::<Complex64>()
     }
+}
+
+struct Scaled<A, R>
+where
+    R: std::ops::Mul<R, Output = R> + Sync + Send + Clone,
+{
+    scale: R,
+    func: Box<dyn Func<A, R>>,
+}
+
+impl<A, R> Func<A, R> for Scaled<A, R>
+where
+    R: std::ops::Mul<R, Output = R> + Sync + Send + Clone,
+{
+    fn eval(&self, x: A) -> R {
+        self.func.eval(x) * self.scale.clone()
+    }
+}
+
+fn renormalize_factor(wave_func: &dyn Func<f64, Complex64>, approx_inf: (f64, f64)) -> f64 {
+    integrate(
+        evaluate_function_between(
+            wave_func,
+            approx_inf.0 * (1.0 - f64::EPSILON),
+            approx_inf.1 * (1.0 - f64::EPSILON),
+            INTEG_STEPS,
+        )
+        .par_iter()
+        .map(|p| Point {
+            x: p.x,
+            y: p.y.norm_sqr(),
+        })
+        .collect(),
+        TRAPEZE_PER_THREAD,
+    )
+}
+
+pub fn renormalize(
+    wave_func: Box<dyn Func<f64, Complex64>>,
+    approx_inf: (f64, f64),
+) -> Box<dyn Func<f64, Complex64>> {
+    let area = renormalize_factor(wave_func.as_ref(), approx_inf);
+    return Box::new(Scaled::<f64, Complex64> {
+        scale: area.into(),
+        func: wave_func,
+    });
 }
 
 #[cfg(test)]

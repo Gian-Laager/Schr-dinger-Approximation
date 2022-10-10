@@ -19,7 +19,7 @@ pub fn sigmoid(x: f64) -> f64 {
     1.0 / (1.0 + (-x).exp())
 }
 
-pub fn identiy(c: Complex64) -> Complex64 {
+pub fn identity(c: Complex64) -> Complex64 {
     c
 }
 
