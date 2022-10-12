@@ -23,6 +23,7 @@ use crate::wkb_wave_func::WkbWaveFunction;
 use num::complex::Complex64;
 use num::pow::Pow;
 use rayon::iter::*;
+use std::collections::HashMap;
 use std::f64;
 use std::fs::File;
 use std::io::Write;
@@ -51,46 +52,57 @@ fn main() {
     std::env::set_current_dir(&output_dir).unwrap();
 
     let wave_function = wave_function_builder::SuperPosition::new(
-        &potentials::mexican_hat,
+        &potentials::double_mexican_hat,
         MASS,
         &[
-            (37, complex(1.0, 0.0)),
-            (38, complex(1.0, 0.0)),
-            (39, complex(1.0, 0.0)),
+            (2, 1.0.into()),
+            (5, 1.0.into()),
+            (8, 1.0.into()),
+            (40, 1.0.into()),
         ],
         APPROX_INF,
         VIEW_FACTOR,
         ScalingType::Renormalize(complex(1.0, 0.0)),
     );
 
+    // let wave_function = wave_function_builder::WaveFunction::new(
+    //     &potentials::mexican_hat,
+    //     MASS,
+    //     2,
+    //     APPROX_INF,
+    //     1.5,
+    //     ScalingType::Renormalize(1.0.into()),
+    // );
+    // println!("energy: {}", wave_function.get_energy());
+    
     let all_values = evaluate_function_between(
         &wave_function,
         wave_function.get_view().0,
         wave_function.get_view().1,
         NUMBER_OF_POINTS,
     );
-
+    
     let all_values_str = all_values
         .par_iter()
         .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
         .reduce(|| String::new(), |s: String, current: String| s + &*current);
-
+    
     let mut data_full = File::create("data.txt").unwrap();
     data_full.write_all(all_values_str.as_ref()).unwrap();
-
+    
     let mut plot_3d_file = File::create("plot_3d.gnuplot").unwrap();
     let plot_3d_cmd: String = "splot \"data.txt\" u 1:2:3 t \"Psi\" w l".to_string();
     plot_3d_file.write_all(plot_3d_cmd.as_ref()).unwrap();
-
+    
     let mut plot_file = File::create("plot.gnuplot").unwrap();
-
+    
     let plot_cmd = "plot \"data.txt\" u 1:2 t \"Psi\" w l".to_string();
-
+    
     plot_file.write_all(plot_cmd.as_ref()).unwrap();
-
+    
     let mut plot_imag_file = File::create("plot_im.gnuplot").unwrap();
-
+    
     let plot_imag_cmd = "plot \"data.txt\" u 1:3 t \"Psi\" w l".to_string();
-
+    
     plot_imag_file.write_all(plot_imag_cmd.as_ref()).unwrap();
 }

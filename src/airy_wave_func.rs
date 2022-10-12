@@ -21,6 +21,7 @@ fn Bi(x: Complex64) -> Complex64 {
 
 #[derive(Clone)]
 pub struct AiryWaveFunction {
+    c: Complex64,
     u_1: f64,
     pub turning_point: f64,
     phase: Arc<Phase>,
@@ -32,6 +33,7 @@ impl AiryWaveFunction {
     pub fn get_op(&self) -> Box<fn(Complex64) -> Complex64> {
         Box::new(self.op)
     }
+
 
     fn get_u_1_cube_root(u_1: f64) -> f64 {
         signum(u_1) * u_1.abs().pow(1.0 / 3.0)
@@ -59,6 +61,7 @@ impl AiryWaveFunction {
                     phase: phase.clone(),
                     ts: (*t1, *t2),
                     op: identity,
+                    c: 1.0.into()
                 }
             })
             .collect::<Vec<AiryWaveFunction>>();
@@ -72,6 +75,18 @@ impl AiryWaveFunction {
             phase: self.phase.clone(),
             ts: self.ts,
             op,
+            c: self.c
+        }
+    }
+
+    pub fn with_c(&self, c: Complex64) -> AiryWaveFunction {
+        AiryWaveFunction {
+            u_1: self.u_1,
+            turning_point: self.turning_point,
+            phase: self.phase.clone(),
+            ts: self.ts,
+            op: self.op,
+            c
         }
     }
 }
@@ -85,8 +100,8 @@ impl Func<f64, Complex64> for AiryWaveFunction {
                 * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
                 as Complex64
                 * complex(
-                    (self.u_1.signum() * (self.turning_point - x) + self.phase.phase_off).cos(),
-                    (self.u_1.signum() * (self.turning_point - x) + self.phase.phase_off).sin(),
+                    (self.u_1.signum() * ((self.turning_point - x) - self.phase.phase_off)).cos(),
+                    (self.u_1.signum() * ((self.turning_point - x) - self.phase.phase_off)).sin(),
                 ),
         );
     }

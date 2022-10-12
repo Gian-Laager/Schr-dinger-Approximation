@@ -208,7 +208,7 @@ fn sign_match_complex(mut c1: Complex64, mut c2: Complex64) -> bool {
     return sign_match(c1.re, c2.re) && sign_match(c1.im, c2.im);
 }
 
-pub fn find_best_op(
+pub fn find_best_op_wave_func_part(
     phase: Arc<Phase>,
     previous: &dyn WaveFunctionPartWithOp,
     current: &dyn WaveFunctionPartWithOp,
@@ -225,26 +225,55 @@ pub fn find_best_op(
     let deriv = derivative(&|x| current.eval(x), current.range().0);
     let val = current.eval(boundary);
 
-    if (phase.potential)(boundary) >= phase.energy {
+    return if (phase.potential)(boundary) >= phase.energy {
         *previous.get_op()
-    } else if sign_match_complex(conjugate(deriv), deriv_prev)
-        && sign_match_complex(conjugate(val), val_prev)
-    {
-        conjugate
-    } else if sign_match_complex(negative_conj(deriv), deriv_prev)
-        && sign_match_complex(negative_conj(val), val_prev)
-    {
-        negative_conj
-    } else if sign_match_complex(negative(deriv), deriv_prev)
-        && sign_match_complex(negative(val), val_prev)
-    {
-        negative
     } else {
-        identity
-    }
+        let conj_deriv = conjugate(deriv);
+        let conj_val = conjugate(val);
+        let neg_conj_deriv = negative_conj(deriv);
+        let neg_conj_val = negative_conj(val);
+        let neg_deriv = negative(deriv);
+        let neg_val = negative(val);
+
+        let conj_mse = (conj_deriv - deriv_prev).norm_sqr() + (conj_val - val_prev).norm_sqr();
+        let neg_conj_mse =
+            (neg_conj_deriv - deriv_prev).norm_sqr() + (neg_conj_val - val_prev).norm_sqr();
+        let neg_mse = (neg_deriv - deriv_prev).norm_sqr() + (neg_val - val_prev).norm_sqr();
+        let id_mse = (deriv - deriv_prev).norm_sqr() + (val - val_prev).norm_sqr();
+
+        if conj_mse < neg_conj_mse && conj_mse < neg_mse && conj_mse < id_mse {
+            println!(
+                "conjugate mse, conj: {}, neg conj: {}, neg: {}, id: {}",
+                conj_mse, neg_conj_mse, neg_mse, id_mse
+            );
+            conjugate
+        } else if neg_conj_mse < conj_mse && neg_conj_mse < neg_mse && neg_conj_mse < id_mse {
+            println!(
+                "negative_conj mse, conj: {}, neg conj: {}, neg: {}, id: {}",
+                conj_mse, neg_conj_mse, neg_mse, id_mse
+            );
+            negative_conj
+        } else if neg_mse < conj_mse && neg_mse < neg_conj_mse && neg_mse < id_mse {
+            println!(
+                "negative mse, conj: {}, neg conj: {}, neg: {}, id: {}",
+                conj_mse, neg_conj_mse, neg_mse, id_mse
+            );
+            negative
+        } else {
+            println!(
+                "identity mse, conj: {}, neg conj: {}, neg: {}, id: {}",
+                conj_mse, neg_conj_mse, neg_mse, id_mse
+            );
+            identity
+        }
+    };
 }
 
 impl WaveFunction {
+    pub fn get_energy(&self) -> f64 {
+        self.phase.energy
+    }
+
     pub fn new<F: Fn(f64) -> f64 + Sync + Send>(
         potential: &'static F,
         mass: f64,
@@ -278,13 +307,50 @@ impl WaveFunction {
             approx_inf.clone()
         };
 
-        let mut phase = Phase::new(energy, MASS, potential, f64::consts::PI / 4.0);
+        let mut phase = Phase::new(energy, MASS, potential, 0.0);
         let (_, t_boundaries) =
             AiryWaveFunction::new(Arc::new(phase.clone()), (approx_inf.0, approx_inf.1));
         if t_boundaries.ts.len() != 0 {
-            // conjecture based on observations in all the plots
-            phase.phase_off =
-                f64::consts::PI / (t_boundaries.ts.len() as f64) - f64::consts::PI / 2.0;
+            let phase_offs = t_boundaries
+                .ts
+                .iter()
+                .zip(t_boundaries.ts.iter().skip(1))
+                .map(|((_, t1), (_, t2))| (t1, t2))
+                .map(|(turn_left, turn_right)| -> Option<f64> {
+                    let critical_x = (turn_left + turn_right) / 2.0;
+                    if (phase.potential)(critical_x) > phase.energy {
+                        return None;
+                    }
+
+                    let int_left = integrate(
+                        evaluate_function_between(&phase, *turn_left, critical_x, INTEG_STEPS),
+                        TRAPEZE_PER_THREAD,
+                    );
+                    let int_right = -integrate(
+                        evaluate_function_between(&phase, critical_x, *turn_right, INTEG_STEPS),
+                        TRAPEZE_PER_THREAD,
+                    );
+
+                    let phase_off = (int_left - int_right) / 2.0;
+
+                    println!("critical_x: {}", critical_x);
+                    println!("value left: {}", complex(0.0, int_left - phase_off).exp());
+
+                    println!("value right: {}", complex(0.0, int_right + phase_off).exp());
+
+                    Some(phase_off)
+                })
+                .filter(Option::is_some)
+                .map(|v| v.unwrap())
+                .collect::<Vec<f64>>();
+
+            phase.phase_off = phase_offs.iter().sum::<f64>() / phase_offs.len() as f64;
+            println!("phase_offs: {:#?}", phase_offs);
+            println!("phase_off: {}", phase.phase_off);
+            println!(
+                "phase_off / (2 * PI) : {}",
+                phase.phase_off % (2.0 * f64::consts::PI) / (2.0 * f64::consts::PI)
+            );
         }
         let phase = Arc::new(phase);
 
@@ -295,8 +361,8 @@ impl WaveFunction {
             Vec<(f64, f64)>,
         ) = if boundaries.ts.len() == 0 {
             println!("No turning points found in view! Results might be in accurate");
-            let wkb1 = WkbWaveFunction::new(phase.clone(), 1.0, INTEG_STEPS, APPROX_INF.0);
-            let wkb2 = WkbWaveFunction::new(phase.clone(), 1.0, INTEG_STEPS, APPROX_INF.1);
+            let wkb1 = WkbWaveFunction::new(phase.clone(), 1.0.into(), INTEG_STEPS, APPROX_INF.0);
+            let wkb2 = WkbWaveFunction::new(phase.clone(), 1.0.into(), INTEG_STEPS, APPROX_INF.1);
 
             let center = (view.0 + view.1) / 2.0;
             let wkb1 = Box::new(PureWkb {
@@ -309,7 +375,7 @@ impl WaveFunction {
                 range: (center, approx_inf.1),
             });
 
-            let op = find_best_op(phase.clone(), wkb1.as_ref(), wkb2.as_ref());
+            let op = find_best_op_wave_func_part(phase.clone(), wkb1.as_ref(), wkb2.as_ref());
 
             let wkb1_range = wkb1.range();
             (
@@ -335,7 +401,7 @@ impl WaveFunction {
                 .map(
                     |((previous, boundary), next)| -> (WkbWaveFunction, (f64, f64)) {
                         (
-                            WkbWaveFunction::new(phase.clone(), 1.0, INTEG_STEPS, *boundary),
+                            WkbWaveFunction::new(phase.clone(), 1.0.into(), INTEG_STEPS, *boundary),
                             ((boundary + previous) / 2.0, (next + boundary) / 2.0),
                         )
                     },
@@ -368,8 +434,11 @@ impl WaveFunction {
             for i in 0..(approx_parts.len() - 1) {
                 let part1 = &approx_parts[i];
                 let part2 = &approx_parts[i + 1];
-                let p2_with_op =
-                    part2.with_op(find_best_op(phase.clone(), part1.as_ref(), part2.as_ref()));
+                let p2_with_op = part2.with_op(find_best_op_wave_func_part(
+                    phase.clone(),
+                    part1.as_ref(),
+                    part2.as_ref(),
+                ));
                 approx_parts_with_op.push(Arc::from(p2_with_op));
             }
 

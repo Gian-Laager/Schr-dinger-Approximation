@@ -59,7 +59,7 @@ impl Func<f64, f64> for Phase {
 
 #[derive(Clone)]
 pub struct WkbWaveFunction {
-    pub c: f64,
+    pub c: Complex64,
     pub turning_point: f64,
     pub phase: Arc<Phase>,
     integration_steps: usize,
@@ -67,9 +67,23 @@ pub struct WkbWaveFunction {
 }
 
 impl WkbWaveFunction {
+    pub fn get_c(&self) -> Complex64 {
+        self.c
+    }
+
+    pub fn with_c(&self, c: Complex64) -> WkbWaveFunction {
+        WkbWaveFunction {
+            c,
+            turning_point: self.turning_point,
+            phase: self.phase.clone(),
+            integration_steps: self.integration_steps,
+            op: self.op,
+        }
+    }
+
     pub fn new(
         phase: Arc<Phase>,
-        c: f64,
+        c: Complex64,
         integration_steps: usize,
         turning_point: f64,
     ) -> WkbWaveFunction {
@@ -110,14 +124,29 @@ impl Func<f64, Complex64> for WkbWaveFunction {
         );
 
         let val = if self.phase.energy < (self.phase.potential)(x) {
-            (self.c * 0.5 * (-integral.abs()).exp())
-                * complex((self.phase.phase_off).cos(), (self.phase.phase_off).sin())
-                / self.phase.sqrt_momentum(x)
+            if x < self.turning_point {
+                (self.c * 0.5 * (-integral.abs()).exp())
+                    * complex((-self.phase.phase_off).cos(), (-self.phase.phase_off).sin())
+                    / self.phase.sqrt_momentum(x)
+            } else {
+                (self.c * 0.5 * (-integral.abs()).exp())
+                    * complex((self.phase.phase_off).cos(), (self.phase.phase_off).sin())
+                    / self.phase.sqrt_momentum(x)
+            }
         } else {
-            complex(
-                self.c * (-integral.abs() + self.phase.phase_off).cos(),
-                self.c * (-integral.abs() + self.phase.phase_off).sin(),
-            ) / self.phase.sqrt_momentum(x)
+            if x < self.turning_point {
+                self.c * complex(
+                        (-integral + self.phase.phase_off).cos(),
+                        (-integral + self.phase.phase_off).sin(),
+                    )
+                    / self.phase.sqrt_momentum(x)
+            } else {
+                self.c * complex(
+                        (integral - self.phase.phase_off).sin(),
+                        (integral - self.phase.phase_off).cos(),
+                    )
+                    / self.phase.sqrt_momentum(x)
+            }
         };
 
         return (self.op)(val);

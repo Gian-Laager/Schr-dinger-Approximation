@@ -76,6 +76,11 @@ pub fn double_mexican_hat(x: f64) -> f64 {
     (x - 4.0).powi(2) * x.powi(2) * (x + 4.0).powi(2)
 }
 
+#[allow(unused)]
+pub fn triple_mexican_hat(x: f64) -> f64 {
+    (x - 6.0).powi(2) * (x - 3.0).powi(2) * (x + 3.0).powi(2) * (x + 6.0).powi(2)
+}
+
 pub fn square(x: f64) -> f64 {
     x * x
 }

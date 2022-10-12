@@ -5,7 +5,7 @@ use crate::*;
 use num::signum;
 
 const MAX_TURNING_POINTS: usize = 256;
-const ACCURACY: f64 = f64::EPSILON * 10.0;
+const ACCURACY: f64 = 1e-9;
 
 pub struct TGroup {
     pub ts: Vec<((f64, f64), f64)>,
@@ -113,21 +113,11 @@ fn find_zeros(phase: &Phase, view: (f64, f64)) -> Vec<f64> {
     });
     let mut zeros = NewtonsMethodFindNewZero::new(validity_func, ACCURACY, 1e4 as usize);
 
-    let mut i = 0;
-    let mut previous_guess = f64::NAN;
     (0..MAX_TURNING_POINTS).into_iter().for_each(|_| {
         let modified_func = |x| zeros.modified_func(x);
 
         let guess = make_guess(&modified_func, view, 1000);
-        match guess.get(i).map(|g| *g == previous_guess) {
-            Some(true) => i += 1,
-            Some(false) => {
-                previous_guess = *guess.get(i).unwrap();
-                i = 0;
-            }
-            None => return,
-        }
-        guess.get(i).map(|g| zeros.next_zero(*g));
+        guess.map(|g| zeros.next_zero(g));
     });
 
     let view = if view.0 < view.1 {
