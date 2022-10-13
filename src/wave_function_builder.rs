@@ -10,6 +10,7 @@ pub enum ScalingType {
 
 pub trait WaveFunctionPart: Func<f64, Complex64> + Sync + Send {
     fn range(&self) -> (f64, f64);
+    fn as_func(&self) -> Box<dyn Func<f64, Complex64>>;
 }
 
 pub trait WaveFunctionPartWithOp: WaveFunctionPart {
@@ -38,6 +39,9 @@ impl WaveFunctionPart for Joint {
             (self.cut + self.delta, self.cut)
         }
     }
+    fn as_func(&self) -> Box<dyn Func<f64, Complex64>> {
+        return Box::new(self.clone());
+    }
 }
 
 impl Func<f64, Complex64> for Joint {
@@ -65,6 +69,9 @@ struct PureWkb {
 impl WaveFunctionPart for PureWkb {
     fn range(&self) -> (f64, f64) {
         self.range
+    }
+    fn as_func(&self) -> Box<dyn Func<f64, Complex64>> {
+        Box::new(self.clone())
     }
 }
 
@@ -103,6 +110,9 @@ struct ApproxPart {
 impl WaveFunctionPart for ApproxPart {
     fn range(&self) -> (f64, f64) {
         self.range
+    }
+    fn as_func(&self) -> Box<dyn Func<f64, Complex64>> {
+        Box::new(self.clone())
     }
 }
 
@@ -356,7 +366,7 @@ impl WaveFunction {
 
         let (airy_wave_funcs, boundaries) = AiryWaveFunction::new(phase.clone(), (view.0, view.1));
         let (parts, airy_ranges, wkb_ranges): (
-            Vec<Arc<dyn WaveFunctionPartWithOp>>,
+            Vec<Arc<dyn WaveFunctionPart>>,
             Vec<(f64, f64)>,
             Vec<(f64, f64)>,
         ) = if boundaries.ts.len() == 0 {
@@ -380,8 +390,8 @@ impl WaveFunction {
             let wkb1_range = wkb1.range();
             (
                 vec![
-                    Arc::from(wkb1 as Box<dyn WaveFunctionPartWithOp>),
-                    Arc::from(wkb2.with_op(op)),
+                    Arc::from(wkb1.as_wave_function_part()),
+                    Arc::from(wkb2.with_op(op).as_wave_function_part()),
                 ],
                 vec![],
                 vec![wkb1_range, wkb2.range()],
@@ -442,13 +452,34 @@ impl WaveFunction {
                 approx_parts_with_op.push(Arc::from(p2_with_op));
             }
 
-            (approx_parts_with_op, airy_ranges, wkb_ranges)
-        };
+            let mut approx_parts_with_joints: Vec<Arc<dyn WaveFunctionPart>> = approx_parts_with_op
+                .first()
+                .map_or(vec![], |part: &Arc<dyn WaveFunctionPartWithOp>| {
+                    vec![Arc::from(part.as_wave_function_part())]
+                });
 
-        let parts = parts
-            .iter()
-            .map(|p| Arc::from(p.as_wave_function_part()))
-            .collect();
+            for (prev, curr) in approx_parts_with_op
+                .iter()
+                .zip(approx_parts_with_op.iter().skip(1))
+            {
+                assert!(float_compare(prev.range().1, curr.range().0, 1e-4));
+
+                let distance =
+                    (prev.range().1 - prev.range().0) + (curr.range().1 - curr.range().0);
+                let delta = distance * WKB_TRANSITION_FRACTION;
+                let joint = Joint {
+                    left: Arc::from(prev.as_func()),
+                    right: Arc::from(curr.as_func()),
+                    cut: prev.range().0 - delta / 2.0,
+                    delta,
+                };
+
+                approx_parts_with_joints.push(Arc::new(joint));
+                approx_parts_with_joints.push(Arc::from(curr.as_wave_function_part()));
+            }
+
+            (approx_parts_with_joints, airy_ranges, wkb_ranges)
+        };
 
         match scaling {
             ScalingType::Mul(s) => WaveFunction {

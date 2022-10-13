@@ -41,6 +41,7 @@ const NORMALIZE_POTENTIAL: bool = false;
 
 const MASS: f64 = 2.0;
 const AIRY_EXTRA: f64 = 0.5;
+const WKB_TRANSITION_FRACTION: f64 = 0.1;
 const N_ENERGY: usize = 12;
 
 const APPROX_INF: (f64, f64) = (-200.0, 200.0);
