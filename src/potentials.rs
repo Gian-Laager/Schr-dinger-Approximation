@@ -1,5 +1,7 @@
 use crate::*;
 
+const ENERGY_INF: f64 = 1e6;
+
 #[allow(unused)]
 pub fn smooth_step(x: f64) -> f64 {
     const TRANSITION: f64 = 0.5;

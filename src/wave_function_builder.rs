@@ -337,7 +337,7 @@ impl WaveFunction {
             approx_inf.clone()
         };
 
-        let phase = Arc::new(Phase::new(energy, MASS, potential));
+        let phase = Arc::new(Phase::new(energy, mass, potential));
 
         let (airy_wave_funcs, boundaries) = AiryWaveFunction::new(phase.clone(), (view.0, view.1));
         let (parts, airy_ranges, wkb_ranges): (
