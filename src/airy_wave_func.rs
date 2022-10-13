@@ -27,13 +27,13 @@ pub struct AiryWaveFunction {
     phase: Arc<Phase>,
     pub ts: (f64, f64),
     op: fn(Complex64) -> Complex64,
+    phase_off: f64,
 }
 
 impl AiryWaveFunction {
     pub fn get_op(&self) -> Box<fn(Complex64) -> Complex64> {
         Box::new(self.op)
     }
-
 
     fn get_u_1_cube_root(u_1: f64) -> f64 {
         signum(u_1) * u_1.abs().pow(1.0 / 3.0)
@@ -61,7 +61,8 @@ impl AiryWaveFunction {
                     phase: phase.clone(),
                     ts: (*t1, *t2),
                     op: identity,
-                    c: 1.0.into()
+                    c: 1.0.into(),
+                    phase_off: 0.0,
                 }
             })
             .collect::<Vec<AiryWaveFunction>>();
@@ -75,7 +76,8 @@ impl AiryWaveFunction {
             phase: self.phase.clone(),
             ts: self.ts,
             op,
-            c: self.c
+            c: self.c,
+            phase_off: self.phase_off,
         }
     }
 
@@ -86,7 +88,20 @@ impl AiryWaveFunction {
             phase: self.phase.clone(),
             ts: self.ts,
             op: self.op,
-            c
+            c,
+            phase_off: self.phase_off,
+        }
+    }
+
+    pub fn with_phase_off(&self, phase_off: f64) -> AiryWaveFunction {
+        AiryWaveFunction {
+            u_1: self.u_1,
+            turning_point: self.turning_point,
+            phase: self.phase.clone(),
+            ts: self.ts,
+            op: self.op,
+            c: self.c,
+            phase_off,
         }
     }
 }
@@ -95,15 +110,27 @@ impl Func<f64, Complex64> for AiryWaveFunction {
     fn eval(&self, x: f64) -> Complex64 {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
 
-        return (self.op)(
-            ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
-                * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
-                as Complex64
-                * complex(
-                    (self.u_1.signum() * ((self.turning_point - x) - self.phase.phase_off)).cos(),
-                    (self.u_1.signum() * ((self.turning_point - x) - self.phase.phase_off)).sin(),
-                ),
-        );
+        if self.turning_point < x {
+            return (self.op)(
+                ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
+                    * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
+                    as Complex64
+                    * complex(
+                        (-((self.turning_point - x) - self.phase_off)).cos(),
+                        (-((self.turning_point - x) - self.phase_off)).sin(),
+                    ),
+            );
+        } else {
+            return (self.op)(
+                ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
+                    * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
+                    as Complex64
+                    * complex(
+                        (-(self.turning_point - x) + self.phase_off).cos(),
+                        (-(self.turning_point - x) + self.phase_off).sin(),
+                    ),
+            );
+        }
     }
 }
 

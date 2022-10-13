@@ -216,6 +216,28 @@ fn sign_match_complex(mut c1: Complex64, mut c2: Complex64) -> bool {
     return sign_match(c1.re, c2.re) && sign_match(c1.im, c2.im);
 }
 
+fn calc_phase_offset(phase: Arc<Phase>, (turn_left, turn_right): (f64, f64)) -> Option<f64> {
+    let critical_x = (turn_left + turn_right) / 2.0;
+    if (phase.potential)(critical_x) > phase.energy {
+        return None;
+    }
+
+    let int_left = integrate(
+        evaluate_function_between(phase.as_ref(), turn_left, critical_x, INTEG_STEPS),
+        TRAPEZE_PER_THREAD,
+    );
+    let int_right = -integrate(
+        evaluate_function_between(phase.as_ref(), critical_x, turn_right, INTEG_STEPS),
+        TRAPEZE_PER_THREAD,
+    );
+
+    let phase_off = (int_left - int_right) / 2.0;
+
+    println!("phase_off: {:.12}, turn: ({:.6}, {:.6}), cut: {}", phase_off, turn_left, turn_right, (turn_right + turn_left) / 2.0);
+
+    Some(phase_off)
+}
+
 pub fn find_best_op_wave_func_part(
     phase: Arc<Phase>,
     previous: &dyn WaveFunctionPartWithOp,
@@ -257,7 +279,7 @@ pub fn find_best_op_wave_func_part(
             conjugate
         } else if neg_conj_mse < conj_mse && neg_conj_mse < neg_mse && neg_conj_mse < id_mse {
             println!(
-                "negative_conj mse, conj: {}, neg conj: {}, neg: {}, id: {}",
+                "negative conj mse, conj: {}, neg conj: {}, neg: {}, id: {}",
                 conj_mse, neg_conj_mse, neg_mse, id_mse
             );
             negative_conj
@@ -315,52 +337,7 @@ impl WaveFunction {
             approx_inf.clone()
         };
 
-        let mut phase = Phase::new(energy, MASS, potential, 0.0);
-        let (_, t_boundaries) =
-            AiryWaveFunction::new(Arc::new(phase.clone()), (approx_inf.0, approx_inf.1));
-        if t_boundaries.ts.len() != 0 {
-            let phase_offs = t_boundaries
-                .ts
-                .iter()
-                .zip(t_boundaries.ts.iter().skip(1))
-                .map(|((_, t1), (_, t2))| (t1, t2))
-                .map(|(turn_left, turn_right)| -> Option<f64> {
-                    let critical_x = (turn_left + turn_right) / 2.0;
-                    if (phase.potential)(critical_x) > phase.energy {
-                        return None;
-                    }
-
-                    let int_left = integrate(
-                        evaluate_function_between(&phase, *turn_left, critical_x, INTEG_STEPS),
-                        TRAPEZE_PER_THREAD,
-                    );
-                    let int_right = -integrate(
-                        evaluate_function_between(&phase, critical_x, *turn_right, INTEG_STEPS),
-                        TRAPEZE_PER_THREAD,
-                    );
-
-                    let phase_off = (int_left - int_right) / 2.0;
-
-                    println!("critical_x: {}", critical_x);
-                    println!("value left: {}", complex(0.0, int_left - phase_off).exp());
-
-                    println!("value right: {}", complex(0.0, int_right + phase_off).exp());
-
-                    Some(phase_off)
-                })
-                .filter(Option::is_some)
-                .map(|v| v.unwrap())
-                .collect::<Vec<f64>>();
-
-            phase.phase_off = phase_offs.iter().sum::<f64>() / phase_offs.len() as f64;
-            println!("phase_offs: {:#?}", phase_offs);
-            println!("phase_off: {}", phase.phase_off);
-            println!(
-                "phase_off / (2 * PI) : {}",
-                phase.phase_off % (2.0 * f64::consts::PI) / (2.0 * f64::consts::PI)
-            );
-        }
-        let phase = Arc::new(phase);
+        let phase = Arc::new(Phase::new(energy, MASS, potential));
 
         let (airy_wave_funcs, boundaries) = AiryWaveFunction::new(phase.clone(), (view.0, view.1));
         let (parts, airy_ranges, wkb_ranges): (
@@ -369,8 +346,20 @@ impl WaveFunction {
             Vec<(f64, f64)>,
         ) = if boundaries.ts.len() == 0 {
             println!("No turning points found in view! Results might be in accurate");
-            let wkb1 = WkbWaveFunction::new(phase.clone(), 1.0.into(), INTEG_STEPS, APPROX_INF.0);
-            let wkb2 = WkbWaveFunction::new(phase.clone(), 1.0.into(), INTEG_STEPS, APPROX_INF.1);
+            let wkb1 = WkbWaveFunction::new(
+                phase.clone(),
+                1.0.into(),
+                INTEG_STEPS,
+                approx_inf.0,
+                calc_phase_offset(phase.clone(), approx_inf).unwrap_or(f64::consts::PI / 4.0),
+            );
+            let wkb2 = WkbWaveFunction::new(
+                phase.clone(),
+                1.0.into(),
+                INTEG_STEPS,
+                approx_inf.1,
+                calc_phase_offset(phase.clone(), approx_inf).unwrap_or(f64::consts::PI / 4.0),
+            );
 
             let center = (view.0 + view.1) / 2.0;
             let wkb1 = Box::new(PureWkb {
@@ -417,7 +406,14 @@ impl WaveFunction {
                 .map(
                     |((previous, boundary), next)| -> (WkbWaveFunction, (f64, f64)) {
                         (
-                            WkbWaveFunction::new(phase.clone(), 1.0.into(), INTEG_STEPS, *boundary),
+                            WkbWaveFunction::new(
+                                phase.clone(),
+                                1.0.into(),
+                                INTEG_STEPS,
+                                *boundary,
+                                calc_phase_offset(phase.clone(), (*previous, *boundary))
+                                    .unwrap_or(f64::consts::PI / 4.0),
+                            ),
                             ((boundary + previous) / 2.0, (next + boundary) / 2.0),
                         )
                     },
@@ -427,7 +423,7 @@ impl WaveFunction {
             let wkb_airy_pair: Vec<(&(WkbWaveFunction, (f64, f64)), AiryWaveFunction)> = wave_funcs
                 .iter()
                 .zip(airy_wave_funcs.iter())
-                .map(|(w, a)| (w, a.clone()))
+                .map(|(w, a)| (w, a.with_phase_off(w.0.phase_off)))
                 .collect();
 
             let wkb_ranges = wkb_airy_pair
@@ -617,14 +613,16 @@ impl SuperPosition {
         let wave_funcs = n_energies_scaling
             .iter()
             .map(|(e, scale)| {
-                WaveFunction::new(
+                let wave = WaveFunction::new(
                     potential,
                     mass,
                     *e,
                     approx_inf,
                     view_factor,
                     ScalingType::Mul(*scale),
-                )
+                );
+                println!("Calculated Energy {}\n", *e);
+                return wave;
             })
             .collect();
 

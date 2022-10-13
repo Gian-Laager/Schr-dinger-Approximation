@@ -7,15 +7,14 @@ pub struct Phase {
     pub energy: f64,
     pub mass: f64,
     pub potential: Arc<dyn Fn(f64) -> f64 + Send + Sync>,
-    pub phase_off: f64,
 }
 
 impl Display for Phase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Phase {{energy: {}, mass: {}, potential: [func], phase_off: {}}}",
-            self.energy, self.mass, self.phase_off
+            "Phase {{energy: {}, mass: {}, potential: [func]}}",
+            self.energy, self.mass
         )
     }
 }
@@ -26,7 +25,6 @@ impl Phase {
             energy: 0.0,
             mass: 0.0,
             potential: Arc::new(|_x| 0.0),
-            phase_off: f64::consts::PI / 4.0,
         }
     }
 
@@ -34,13 +32,11 @@ impl Phase {
         energy: f64,
         mass: f64,
         potential: &'static F,
-        phase_off: f64,
     ) -> Phase {
         return Phase {
             energy,
             mass,
             potential: Arc::new(potential),
-            phase_off,
         };
     }
 
@@ -64,6 +60,7 @@ pub struct WkbWaveFunction {
     pub phase: Arc<Phase>,
     integration_steps: usize,
     op: fn(Complex64) -> Complex64,
+    pub phase_off: f64,
 }
 
 impl WkbWaveFunction {
@@ -78,6 +75,7 @@ impl WkbWaveFunction {
             phase: self.phase.clone(),
             integration_steps: self.integration_steps,
             op: self.op,
+            phase_off: self.phase_off,
         }
     }
 
@@ -86,6 +84,7 @@ impl WkbWaveFunction {
         c: Complex64,
         integration_steps: usize,
         turning_point: f64,
+        phase_off: f64,
     ) -> WkbWaveFunction {
         return WkbWaveFunction {
             c,
@@ -93,6 +92,7 @@ impl WkbWaveFunction {
             phase: phase.clone(),
             integration_steps,
             op: identity,
+            phase_off,
         };
     }
 
@@ -103,6 +103,7 @@ impl WkbWaveFunction {
             phase: self.phase.clone(),
             integration_steps: self.integration_steps,
             op,
+            phase_off: self.phase_off,
         };
     }
 
@@ -126,24 +127,26 @@ impl Func<f64, Complex64> for WkbWaveFunction {
         let val = if self.phase.energy < (self.phase.potential)(x) {
             if x < self.turning_point {
                 (self.c * 0.5 * (-integral.abs()).exp())
-                    * complex((-self.phase.phase_off).cos(), (-self.phase.phase_off).sin())
+                    * complex((self.phase_off).cos(), (self.phase_off).sin())
                     / self.phase.sqrt_momentum(x)
             } else {
                 (self.c * 0.5 * (-integral.abs()).exp())
-                    * complex((self.phase.phase_off).cos(), (self.phase.phase_off).sin())
+                    * complex((self.phase_off).cos(), (self.phase_off).sin())
                     / self.phase.sqrt_momentum(x)
             }
         } else {
             if x < self.turning_point {
-                self.c * complex(
-                        (-integral + self.phase.phase_off).cos(),
-                        (-integral + self.phase.phase_off).sin(),
+                self.c
+                    * complex(
+                        (-integral + self.phase_off).cos(),
+                        (-integral + self.phase_off).sin(),
                     )
                     / self.phase.sqrt_momentum(x)
             } else {
-                self.c * complex(
-                        (integral - self.phase.phase_off).sin(),
-                        (integral - self.phase.phase_off).cos(),
+                self.c
+                    * complex(
+                        (integral - self.phase_off).sin(),
+                        (integral - self.phase_off).cos(),
                     )
                     / self.phase.sqrt_momentum(x)
             }

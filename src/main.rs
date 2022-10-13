@@ -66,7 +66,7 @@ fn main() {
     // );
 
     let wave_function = wave_function_builder::WaveFunction::new(
-        &potentials::square,
+        &potentials::mexican_hat,
         MASS,
         12,
         APPROX_INF,
