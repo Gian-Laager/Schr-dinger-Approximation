@@ -41,7 +41,7 @@ const NORMALIZE_POTENTIAL: bool = false;
 
 const MASS: f64 = 2.0;
 const AIRY_EXTRA: f64 = 0.5;
-const WKB_TRANSITION_FRACTION: f64 = 0.1;
+const WKB_TRANSITION_FRACTION: f64 = 0.05;
 const N_ENERGY: usize = 12;
 
 const APPROX_INF: (f64, f64) = (-200.0, 200.0);
@@ -76,13 +76,13 @@ fn main() {
     println!("energy: {}", wave_function.get_energy());
 
     let wkb_values = wave_function
-        .get_wkb_ranges()
+        .get_wkb_ranges_in_view()
         .iter()
         .map(|range| {
             evaluate_function_between(
                 &wave_function,
-                f64::max(wave_function.get_view().0, range.0),
-                f64::min(wave_function.get_view().1, range.1),
+                range.0,
+                range.1,
                 NUMBER_OF_POINTS,
             )
         })

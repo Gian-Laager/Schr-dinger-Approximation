@@ -46,8 +46,6 @@ impl WaveFunctionPart for Joint {
 
 impl Func<f64, Complex64> for Joint {
     fn eval(&self, x: f64) -> Complex64 {
-        // self.left.eval(x)
-        //     + (self.right.eval(x) - self.left.eval(x)) * sigmoid((x - self.cut) / self.delta)
         let (left, right) = if self.delta < 0.0 {
             (&self.left, &self.right)
         } else {
@@ -388,10 +386,18 @@ impl WaveFunction {
             let op = find_best_op_wave_func_part(phase.clone(), wkb1.as_ref(), wkb2.as_ref());
 
             let wkb1_range = wkb1.range();
+            let wkb2 = wkb2.with_op(op);
+            let delta = (view.1 - view.0) * WKB_TRANSITION_FRACTION;
             (
                 vec![
+                    Arc::new(Joint {
+                        left: Arc::from(wkb1.as_func()),
+                        right: Arc::from(wkb2.as_func()),
+                        cut: (view.0 + view.1) / 2.0 - delta / 2.0,
+                        delta: delta,
+                    }),
                     Arc::from(wkb1.as_wave_function_part()),
-                    Arc::from(wkb2.with_op(op).as_wave_function_part()),
+                    Arc::from(wkb2.as_wave_function_part()),
                 ],
                 vec![],
                 vec![wkb1_range, wkb2.range()],
@@ -437,7 +443,7 @@ impl WaveFunction {
                 })
                 .collect();
 
-            let mut approx_parts_with_op =
+            let mut approx_parts_with_op: Vec<Arc<dyn WaveFunctionPartWithOp>> =
                 vec![Arc::from(approx_parts.first().unwrap().with_op(identity))];
             approx_parts_with_op.reserve(approx_parts.len() - 1);
 
@@ -452,11 +458,7 @@ impl WaveFunction {
                 approx_parts_with_op.push(Arc::from(p2_with_op));
             }
 
-            let mut approx_parts_with_joints: Vec<Arc<dyn WaveFunctionPart>> = approx_parts_with_op
-                .first()
-                .map_or(vec![], |part: &Arc<dyn WaveFunctionPartWithOp>| {
-                    vec![Arc::from(part.as_wave_function_part())]
-                });
+            let mut approx_parts_with_joints: Vec<Arc<dyn WaveFunctionPart>> = vec![];
 
             for (prev, curr) in approx_parts_with_op
                 .iter()
@@ -464,19 +466,30 @@ impl WaveFunction {
             {
                 assert!(float_compare(prev.range().1, curr.range().0, 1e-4));
 
-                let distance =
-                    (prev.range().1 - prev.range().0) + (curr.range().1 - curr.range().0);
+                let distance = (f64::min(prev.range().1, view.1)
+                    - f64::max(prev.range().0, view.0))
+                    + (f64::min(curr.range().1, view.1) - f64::max(curr.range().0, view.0));
                 let delta = distance * WKB_TRANSITION_FRACTION;
                 let joint = Joint {
                     left: Arc::from(prev.as_func()),
                     right: Arc::from(curr.as_func()),
-                    cut: prev.range().0 - delta / 2.0,
+                    cut: f64::min(prev.range().1, view.1) - delta / 2.0,
                     delta,
                 };
 
+                println!("Joint in range: {:#?}, delta: {}", joint.range(), delta);
+
                 approx_parts_with_joints.push(Arc::new(joint));
-                approx_parts_with_joints.push(Arc::from(curr.as_wave_function_part()));
             }
+
+            approx_parts_with_joints = vec![
+                approx_parts_with_joints,
+                approx_parts_with_op
+                    .iter()
+                    .map(|p| Arc::from(p.as_wave_function_part()))
+                    .collect(),
+            ]
+            .concat();
 
             (approx_parts_with_joints, airy_ranges, wkb_ranges)
         };
@@ -542,6 +555,18 @@ impl WaveFunction {
 
     pub fn get_wkb_ranges(&self) -> &[(f64, f64)] {
         self.wkb_ranges.as_slice()
+    }
+
+    pub fn get_wkb_ranges_in_view(&self) -> Vec<(f64, f64)> {
+        self.wkb_ranges
+            .iter()
+            .map(|range| {
+                (
+                    f64::max(self.get_view().0, range.0),
+                    f64::min(self.get_view().1, range.1),
+                )
+            })
+            .collect::<Vec<(f64, f64)>>()
     }
 
     pub fn is_wkb(&self, x: f64) -> bool {
