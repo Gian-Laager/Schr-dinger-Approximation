@@ -1,5 +1,3 @@
-#![feature(unboxed_closures)]
-
 mod airy;
 mod airy_wave_func;
 mod energy;
@@ -35,34 +33,41 @@ const INTEG_STEPS: usize = 64000;
 const TRAPEZE_PER_THREAD: usize = 1000;
 const NUMBER_OF_POINTS: usize = 100000;
 
-const AIRY_EXTRA: f64 = 0.5;
+const AIRY_TRANSITION_FRACTION: f64 = 0.5;
 const WKB_TRANSITION_FRACTION: f64 = 0.05;
+
+const ENABLE_WKB_JOINTS: bool = false;
+const ENABLE_AIRY_JOINTS: bool = false;
+
+const COMPLEX_AIRY: bool = false;
+const COMPLEX_EXP_WKB: bool = false;
+const COMPLEX_OSZ_WKB: bool = false;
 
 const APPROX_INF: (f64, f64) = (-200.0, 200.0);
 
 fn main() {
-    let wave_function = wave_function_builder::SuperPosition::new(
-        &potentials::square,
-        1.0,
-        &[
-            (5, 1.0.into()),
-            (12, 1.0.into()),
-            (15, 1.0.into()),
-        ],
-        APPROX_INF,
-        1.5,
-        ScalingType::Renormalize(complex(1.0, 0.0)),
-    );
-
-    // let wave_function = wave_function_builder::WaveFunction::new(
+    // let wave_function = wave_function_builder::SuperPosition::new(
     //     &potentials::square,
-    //     MASS,
-    //     12,
+    //     1.0,
+    //     &[
+    //         (4, 1.0.into()),
+    //         (5, complex(0.0, 1.0)),
+    //         (6, complex(1.0, 1.0)),
+    //     ],
     //     APPROX_INF,
     //     1.5,
-    //     ScalingType::Renormalize(1.0.into()),
+    //     ScalingType::Renormalize(complex(1.0, 0.0)),
     // );
 
+    let wave_function = wave_function_builder::WaveFunction::new(
+        &potentials::square,
+        1.0,
+        2,
+        APPROX_INF,
+        1.5,
+        ScalingType::Renormalize(1.0.into()),
+    );
+
     let output_dir = Path::new("output");
-    plot::plot_superposition(&wave_function, output_dir, "data.txt");
+    plot::plot_wavefunction_parts(&wave_function, output_dir, "data.txt");
 }

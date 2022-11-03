@@ -110,25 +110,33 @@ impl Func<f64, Complex64> for AiryWaveFunction {
     fn eval(&self, x: f64) -> Complex64 {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
 
-        if self.turning_point < x {
+        if self.u_1 < 0.0 {
             return (self.op)(
                 ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
                     * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
                     as Complex64
-                    * complex(
-                        (-((self.turning_point - x) - self.phase_off)).cos(),
-                        (-((self.turning_point - x) - self.phase_off)).sin(),
-                    ),
+                    * if COMPLEX_AIRY {
+                        complex(
+                            ((-(self.turning_point - x) + self.phase_off)).cos(),
+                            ((-(self.turning_point - x) + self.phase_off)).sin(),
+                        )
+                    } else {
+                        1.0.into()
+                    },
             );
         } else {
             return (self.op)(
                 ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
                     * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
                     as Complex64
-                    * complex(
-                        (-(self.turning_point - x) + self.phase_off).cos(),
-                        (-(self.turning_point - x) + self.phase_off).sin(),
-                    ),
+                    * if COMPLEX_AIRY {
+                        complex(
+                            ((self.turning_point - x) + self.phase_off).cos(),
+                            ((self.turning_point - x) + self.phase_off).sin(),
+                        )
+                    } else {
+                        1.0.into()
+                    },
             );
         }
     }

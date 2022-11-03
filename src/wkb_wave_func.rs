@@ -56,7 +56,8 @@ impl Func<f64, f64> for Phase {
 #[derive(Clone)]
 pub struct WkbWaveFunction {
     pub c: Complex64,
-    pub turning_point: f64,
+    pub turning_point_exp: f64,
+    pub turning_point_osz: f64,
     pub phase: Arc<Phase>,
     integration_steps: usize,
     op: fn(Complex64) -> Complex64,
@@ -71,7 +72,8 @@ impl WkbWaveFunction {
     pub fn with_c(&self, c: Complex64) -> WkbWaveFunction {
         WkbWaveFunction {
             c,
-            turning_point: self.turning_point,
+            turning_point_exp: self.turning_point_exp,
+            turning_point_osz: self.turning_point_osz,
             phase: self.phase.clone(),
             integration_steps: self.integration_steps,
             op: self.op,
@@ -83,12 +85,15 @@ impl WkbWaveFunction {
         phase: Arc<Phase>,
         c: Complex64,
         integration_steps: usize,
-        turning_point: f64,
+        turning_point_exp: f64,
+        turning_point_osz: f64,
         phase_off: f64,
     ) -> WkbWaveFunction {
+        println!("WKB phase_off: {}", phase_off);
         return WkbWaveFunction {
             c,
-            turning_point,
+            turning_point_exp,
+            turning_point_osz,
             phase: phase.clone(),
             integration_steps,
             op: identity,
@@ -99,7 +104,8 @@ impl WkbWaveFunction {
     pub fn with_op(&self, op: fn(Complex64) -> Complex64) -> WkbWaveFunction {
         return WkbWaveFunction {
             c: self.c,
-            turning_point: self.turning_point,
+            turning_point_exp: self.turning_point_exp,
+            turning_point_osz: self.turning_point_osz,
             phase: self.phase.clone(),
             integration_steps: self.integration_steps,
             op,
@@ -114,42 +120,44 @@ impl WkbWaveFunction {
 
 impl Func<f64, Complex64> for WkbWaveFunction {
     fn eval(&self, x: f64) -> Complex64 {
-        let integral = integrate(
-            evaluate_function_between(
-                self.phase.as_ref(),
-                x,
-                self.turning_point,
-                self.integration_steps,
-            ),
-            TRAPEZE_PER_THREAD,
-        );
-
         let val = if self.phase.energy < (self.phase.potential)(x) {
-            if x < self.turning_point {
+            let integral = integrate(
+                evaluate_function_between(
+                    self.phase.as_ref(),
+                    x,
+                    self.turning_point_exp,
+                    self.integration_steps,
+                ),
+                TRAPEZE_PER_THREAD,
+            );
+            if x < self.turning_point_exp {
                 (self.c * 0.5 * (-integral.abs()).exp())
-                    * complex((self.phase_off).cos(), (self.phase_off).sin())
-                    / self.phase.sqrt_momentum(x)
+                    * if COMPLEX_EXP_WKB {
+                        complex((self.phase_off).cos(), -(self.phase_off).sin())
+                            / self.phase.sqrt_momentum(x)
+                    } else {
+                        1.0.into()
+                    }
             } else {
                 (self.c * 0.5 * (-integral.abs()).exp())
-                    * complex((self.phase_off).cos(), (self.phase_off).sin())
-                    / self.phase.sqrt_momentum(x)
+                    * if COMPLEX_EXP_WKB {
+                        complex((self.phase_off).cos(), (self.phase_off).sin())
+                            / self.phase.sqrt_momentum(x)
+                    } else {
+                        1.0.into()
+                    }
             }
         } else {
-            if x < self.turning_point {
-                self.c
-                    * complex(
-                        (-integral + self.phase_off).cos(),
-                        (-integral + self.phase_off).sin(),
-                    )
-                    / self.phase.sqrt_momentum(x)
-            } else {
-                self.c
-                    * complex(
-                        (integral - self.phase_off).sin(),
-                        (integral - self.phase_off).cos(),
-                    )
-                    / self.phase.sqrt_momentum(x)
-            }
+            let integral = integrate(
+                evaluate_function_between(
+                    self.phase.as_ref(),
+                    x,
+                    self.turning_point_osz,
+                    self.integration_steps,
+                ),
+                TRAPEZE_PER_THREAD,
+            );
+            -self.c * complex((integral - self.phase_off).cos(), 0.0) / self.phase.sqrt_momentum(x)
         };
 
         return (self.op)(val);

@@ -5,7 +5,7 @@ use std::process::Command;
 fn main() {
     Command::new("sh")
         .arg("build.sh")
-        .current_dir("lib/")
+        .current_dir("./lib/")
         .status()
         .unwrap();
 

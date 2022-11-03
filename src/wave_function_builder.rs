@@ -46,15 +46,17 @@ impl WaveFunctionPart for Joint {
 
 impl Func<f64, Complex64> for Joint {
     fn eval(&self, x: f64) -> Complex64 {
-        let (left, right) = if self.delta < 0.0 {
+        let (left, right) = if self.delta > 0.0 {
             (&self.left, &self.right)
         } else {
             (&self.right, &self.left)
         };
 
-        left.eval(x) * f64::sin((x - self.cut) / (self.delta) * f64::consts::PI / 2.0).powi(2)
-            + right.eval(x)
-                * f64::cos((x - self.cut) / (self.delta) * f64::consts::PI / 2.0).powi(2)
+        let delta = self.delta.abs();
+
+        let chi = |x: f64| f64::sin(x * f64::consts::PI / 2.0).powi(2);
+        let left_val = left.eval(x);
+        return left_val + (right.eval(x) - left_val) * chi((x - self.cut) / delta);
     }
 }
 
@@ -136,7 +138,7 @@ impl ApproxPart {
     fn new(airy: AiryWaveFunction, wkb: WkbWaveFunction, range: (f64, f64)) -> ApproxPart {
         let airy_rc = Arc::new(airy);
         let wkb_rc = Arc::new(wkb);
-        let delta = (airy_rc.ts.1 - airy_rc.ts.0) * AIRY_EXTRA;
+        let delta = (airy_rc.ts.1 - airy_rc.ts.0) * AIRY_TRANSITION_FRACTION;
         ApproxPart {
             airy: airy_rc.clone(),
             wkb: wkb_rc.clone(),
@@ -155,24 +157,13 @@ impl ApproxPart {
             range,
         }
     }
-
-    pub fn is_airy(&self, x: f64) -> bool {
-        if is_in_range(self.airy_join_l.range(), x) {
-            return true;
-        } else if is_in_range(self.airy_join_r.range(), x) {
-            return true;
-        } else if is_in_range(self.airy.ts, x) {
-            return true;
-        }
-        return false;
-    }
 }
 
 impl Func<f64, Complex64> for ApproxPart {
     fn eval(&self, x: f64) -> Complex64 {
-        if is_in_range(self.airy_join_l.range(), x) {
+        if is_in_range(self.airy_join_l.range(), x) && ENABLE_AIRY_JOINTS {
             return self.airy_join_l.eval(x);
-        } else if is_in_range(self.airy_join_r.range(), x) {
+        } else if is_in_range(self.airy_join_r.range(), x) && ENABLE_AIRY_JOINTS {
             return self.airy_join_r.eval(x);
         } else if is_in_range(self.airy.ts, x) {
             return self.airy.eval(x);
@@ -217,25 +208,54 @@ fn sign_match_complex(mut c1: Complex64, mut c2: Complex64) -> bool {
 }
 
 fn calc_phase_offset(phase: Arc<Phase>, (turn_left, turn_right): (f64, f64)) -> Option<f64> {
+    // return Some(f64::consts::PI / 4.0);
+
     let critical_x = (turn_left + turn_right) / 2.0;
-    if (phase.potential)(critical_x) > phase.energy {
+    let integral = integrate(
+        evaluate_function_between(phase.as_ref(), critical_x, turn_right, INTEG_STEPS),
+        TRAPEZE_PER_THREAD,
+    ) % (f64::consts::PI);
+
+    let extremum_err = integral.abs() % f64::consts::PI;
+    let root_err = (integral.abs() - f64::consts::PI / 2.0).abs() % f64::consts::PI;
+
+    println!("[calc_phase_offset] extremum_err: {}", extremum_err);
+    println!("[calc_phase_offset] root_err:     {}", root_err);
+
+    if extremum_err == root_err {
+        println!("Error: failed to calculate phase offset");
         return None;
     }
 
-    let int_left = integrate(
-        evaluate_function_between(phase.as_ref(), turn_left, critical_x, INTEG_STEPS),
-        TRAPEZE_PER_THREAD,
-    );
-    let int_right = -integrate(
-        evaluate_function_between(phase.as_ref(), critical_x, turn_right, INTEG_STEPS),
-        TRAPEZE_PER_THREAD,
-    );
+    let result = if root_err > extremum_err {
+        -integral - f64::consts::PI / 2.0
+    } else {
+        -integral
+    };
 
-    let phase_off = (int_left - int_right) / 2.0;
+    // println!("phase_off / PI: {}", (result.abs() % f64::consts::PI) / f64::consts::PI);
+    return Some(result.abs() % f64::consts::PI);
 
-    println!("phase_off: {:.12}, turn: ({:.6}, {:.6}), cut: {}", phase_off, turn_left, turn_right, (turn_right + turn_left) / 2.0);
-
-    Some(phase_off)
+    // let critical_x = (turn_left + turn_right) / 2.0;
+    // if (phase.potential)(critical_x) > phase.energy {
+    //     return None;
+    // }
+    //
+    // let int_left = -integrate(
+    //     evaluate_function_between(phase.as_ref(), critical_x, turn_left, INTEG_STEPS),
+    //     TRAPEZE_PER_THREAD,
+    // );
+    // let int_right = integrate(
+    //     evaluate_function_between(phase.as_ref(), critical_x, turn_left, INTEG_STEPS),
+    //     TRAPEZE_PER_THREAD,
+    // );
+    //
+    // println!("left: {}, right: {}", int_left, int_right);
+    // let phase_off = ((-int_left - int_right) / 2.0) % (2.0 * f64::consts::PI);
+    //
+    // println!("phase_off / PI: {:.12}", phase_off / f64::consts::PI);
+    //
+    // Some(phase_off)
 }
 
 pub fn find_best_op_wave_func_part(
@@ -271,19 +291,19 @@ pub fn find_best_op_wave_func_part(
         let neg_mse = (neg_deriv - deriv_prev).norm_sqr() + (neg_val - val_prev).norm_sqr();
         let id_mse = (deriv - deriv_prev).norm_sqr() + (val - val_prev).norm_sqr();
 
-        if conj_mse < neg_conj_mse && conj_mse < neg_mse && conj_mse < id_mse {
+        if conj_mse <= neg_conj_mse && conj_mse <= neg_mse && conj_mse <= id_mse {
             println!(
                 "conjugate mse, conj: {}, neg conj: {}, neg: {}, id: {}",
                 conj_mse, neg_conj_mse, neg_mse, id_mse
             );
             conjugate
-        } else if neg_conj_mse < conj_mse && neg_conj_mse < neg_mse && neg_conj_mse < id_mse {
+        } else if neg_conj_mse <= conj_mse && neg_conj_mse <= neg_mse && neg_conj_mse <= id_mse {
             println!(
                 "negative conj mse, conj: {}, neg conj: {}, neg: {}, id: {}",
                 conj_mse, neg_conj_mse, neg_mse, id_mse
             );
             negative_conj
-        } else if neg_mse < conj_mse && neg_mse < neg_conj_mse && neg_mse < id_mse {
+        } else if neg_mse <= conj_mse && neg_mse <= neg_conj_mse && neg_mse <= id_mse {
             println!(
                 "negative mse, conj: {}, neg conj: {}, neg: {}, id: {}",
                 conj_mse, neg_conj_mse, neg_mse, id_mse
@@ -351,12 +371,14 @@ impl WaveFunction {
                 1.0.into(),
                 INTEG_STEPS,
                 approx_inf.0,
+                approx_inf.0,
                 calc_phase_offset(phase.clone(), approx_inf).unwrap_or(f64::consts::PI / 4.0),
             );
             let wkb2 = WkbWaveFunction::new(
                 phase.clone(),
                 1.0.into(),
                 INTEG_STEPS,
+                approx_inf.1,
                 approx_inf.1,
                 calc_phase_offset(phase.clone(), approx_inf).unwrap_or(f64::consts::PI / 4.0),
             );
@@ -378,16 +400,23 @@ impl WaveFunction {
             let wkb2 = wkb2.with_op(op);
             let delta = (view.1 - view.0) * WKB_TRANSITION_FRACTION;
             (
-                vec![
-                    Arc::new(Joint {
-                        left: Arc::from(wkb1.as_func()),
-                        right: Arc::from(wkb2.as_func()),
-                        cut: (view.0 + view.1) / 2.0 - delta / 2.0,
-                        delta: delta,
-                    }),
-                    Arc::from(wkb1.as_wave_function_part()),
-                    Arc::from(wkb2.as_wave_function_part()),
-                ],
+                if ENABLE_WKB_JOINTS {
+                    vec![
+                        Arc::new(Joint {
+                            left: Arc::from(wkb1.as_func()),
+                            right: Arc::from(wkb2.as_func()),
+                            cut: (view.0 + view.1) / 2.0 - delta / 2.0,
+                            delta: delta,
+                        }),
+                        Arc::from(wkb1.as_wave_function_part()),
+                        Arc::from(wkb2.as_wave_function_part()),
+                    ]
+                } else {
+                    vec![
+                        Arc::from(wkb1.as_wave_function_part()),
+                        Arc::from(wkb2.as_wave_function_part()),
+                    ]
+                },
                 vec![],
                 vec![wkb1_range, wkb2.range()],
             )
@@ -406,14 +435,27 @@ impl WaveFunction {
                 .map(
                     |((previous, boundary), next)| -> (WkbWaveFunction, (f64, f64)) {
                         (
-                            WkbWaveFunction::new(
-                                phase.clone(),
-                                1.0.into(),
-                                INTEG_STEPS,
-                                *boundary,
-                                calc_phase_offset(phase.clone(), (*previous, *boundary))
-                                    .unwrap_or(f64::consts::PI / 4.0),
-                            ),
+                            if derivative(phase.potential.as_ref(), *boundary) > 0.0 {
+                                WkbWaveFunction::new(
+                                    phase.clone(),
+                                    1.0.into(),
+                                    INTEG_STEPS,
+                                    *boundary,
+                                    *previous,
+                                    calc_phase_offset(phase.clone(), (*previous, *boundary))
+                                        .unwrap_or(f64::consts::PI / 4.0),
+                                )
+                            } else {
+                                WkbWaveFunction::new(
+                                    phase.clone(),
+                                    1.0.into(),
+                                    INTEG_STEPS,
+                                    *boundary,
+                                    *boundary,
+                                    calc_phase_offset(phase.clone(), (*boundary, *next))
+                                        .unwrap_or(f64::consts::PI / 4.0),
+                                )
+                            },
                             ((boundary + previous) / 2.0, (next + boundary) / 2.0),
                         )
                     },
@@ -453,29 +495,30 @@ impl WaveFunction {
                 ));
                 approx_parts_with_op.push(Arc::from(p2_with_op));
             }
-
             let mut approx_parts_with_joints: Vec<Arc<dyn WaveFunctionPart>> = vec![];
 
-            for (prev, curr) in approx_parts_with_op
-                .iter()
-                .zip(approx_parts_with_op.iter().skip(1))
-            {
-                assert!(float_compare(prev.range().1, curr.range().0, 1e-4));
+            if ENABLE_WKB_JOINTS {
+                for (prev, curr) in approx_parts_with_op
+                    .iter()
+                    .zip(approx_parts_with_op.iter().skip(1))
+                {
+                    assert!(float_compare(prev.range().1, curr.range().0, 1e-4));
 
-                let distance = (f64::min(prev.range().1, view.1)
-                    - f64::max(prev.range().0, view.0))
-                    + (f64::min(curr.range().1, view.1) - f64::max(curr.range().0, view.0));
-                let delta = distance * WKB_TRANSITION_FRACTION;
-                let joint = Joint {
-                    left: Arc::from(prev.as_func()),
-                    right: Arc::from(curr.as_func()),
-                    cut: f64::min(prev.range().1, view.1) - delta / 2.0,
-                    delta,
-                };
+                    let distance = (f64::min(prev.range().1, view.1)
+                        - f64::max(prev.range().0, view.0))
+                        + (f64::min(curr.range().1, view.1) - f64::max(curr.range().0, view.0));
+                    let delta = distance * WKB_TRANSITION_FRACTION;
+                    let joint = Joint {
+                        left: Arc::from(prev.as_func()),
+                        right: Arc::from(curr.as_func()),
+                        cut: f64::min(prev.range().1, view.1) - delta / 2.0,
+                        delta,
+                    };
 
-                println!("Joint in range: {:#?}, delta: {}", joint.range(), delta);
+                    println!("Joint in range: {:#?}, delta: {}", joint.range(), delta);
 
-                approx_parts_with_joints.push(Arc::new(joint));
+                    approx_parts_with_joints.push(Arc::new(joint));
+                }
             }
 
             approx_parts_with_joints = vec![
@@ -588,6 +631,10 @@ impl WaveFunction {
     pub fn set_view(&mut self, view: (f64, f64)) {
         self.view = view
     }
+
+    pub fn get_phase(&self) -> Arc<Phase> {
+        self.phase.clone()
+    }
 }
 
 impl Func<f64, Complex64> for WaveFunction {
@@ -641,6 +688,7 @@ impl SuperPosition {
                     scaling: s,
                 };
                 let factor = renormalize_factor(&unscaled, approx_inf);
+                println!("factor: {}", factor);
                 SuperPosition {
                     wave_funcs,
                     scaling: s * factor,
@@ -690,7 +738,7 @@ where
 }
 
 fn renormalize_factor(wave_func: &dyn Func<f64, Complex64>, approx_inf: (f64, f64)) -> f64 {
-    integrate(
+    1.0 / integrate(
         evaluate_function_between(
             wave_func,
             approx_inf.0 * (1.0 - f64::EPSILON),

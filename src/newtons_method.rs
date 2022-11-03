@@ -109,13 +109,34 @@ where
     };
 }
 
-pub fn derivative<F, R>(f: &F, x: f64) -> R
+// pub fn derivative<F, R>(f: &F, x: f64) -> R
+// where
+//     F: Fn(f64) -> R + ?Sized,
+//     R: Sub<R, Output = R> + Div<f64, Output = R>,
+// {
+//     let epsilon = f64::epsilon().sqrt();
+//     (f(x + epsilon / 2.0) - f(x - epsilon / 2.0)) / epsilon
+// }
+
+pub fn derivative<F, R>(func: &F, x: f64) -> R
 where
     F: Fn(f64) -> R + ?Sized,
-    R: Sub<R, Output = R> + Div<f64, Output = R>,
+    R: Sub<R, Output = R> + Div<f64, Output = R> + Mul<f64, Output = R> + Add<R, Output = R>,
 {
-    let epsilon = f64::epsilon().sqrt();
-    (f(x + epsilon / 2.0) - f(x - epsilon / 2.0)) / epsilon
+    let dx = f64::epsilon().sqrt();
+    let dx1 = dx;
+    let dx2 = dx1 * 2.0;
+    let dx3 = dx1 * 3.0;
+
+    let m1 = (func(x + dx1) - func(x - dx1)) / 2.0;
+    let m2 = (func(x + dx2) - func(x - dx2)) / 4.0;
+    let m3 = (func(x + dx3) - func(x - dx3)) / 6.0;
+
+    let fifteen_m1 = m1 * 15.0;
+    let six_m2 = m2 * 6.0;
+    let ten_dx1 = dx1 * 10.0;
+
+    return ((fifteen_m1 - six_m2) + m3) / ten_dx1;
 }
 
 pub fn newtons_method<F>(f: &F, mut guess: f64, precision: f64) -> f64

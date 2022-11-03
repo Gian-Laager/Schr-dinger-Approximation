@@ -74,7 +74,7 @@ impl<A, R> Func<A, R> for Function<A, R> {
     }
 }
 pub struct Derivative<'a> {
-    f: &'a dyn Func<f64, Complex64>,
+    pub f: &'a dyn Func<f64, Complex64>,
 }
 
 impl Func<f64, Complex64> for Derivative<'_> {

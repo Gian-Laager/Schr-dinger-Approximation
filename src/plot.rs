@@ -1,4 +1,26 @@
 use crate::*;
+use std::fmt;
+
+pub fn to_gnuplot_string_complex<X>(values: Vec<Point<X, Complex64>>) -> String
+where
+    X: fmt::Display + Send + Sync,
+{
+    values
+        .par_iter()
+        .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
+        .reduce(|| String::new(), |s: String, current: String| s + &*current)
+}
+
+pub fn to_gnuplot_string<X, Y>(values: Vec<Point<X, Y>>) -> String
+where
+    X: fmt::Display + Send + Sync,
+    Y: fmt::Display + Send + Sync,
+{
+    values
+        .par_iter()
+        .map(|p| -> String { format!("{} {}\n", p.x, p.y) })
+        .reduce(|| String::new(), |s: String, current: String| s + &*current)
+}
 
 pub fn plot_wavefunction_parts(wave_function: &WaveFunction, output_dir: &Path, output_file: &str) {
     std::env::set_current_dir(&output_dir).unwrap();
@@ -24,12 +46,7 @@ pub fn plot_wavefunction_parts(wave_function: &WaveFunction, output_dir: &Path, 
 
     let wkb_values_str = wkb_values
         .par_iter()
-        .map(|values| {
-            values
-                .par_iter()
-                .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
-                .reduce(|| String::new(), |s: String, current: String| s + &*current)
-        })
+        .map(|values| to_gnuplot_string_complex(values.to_vec()))
         .reduce(
             || String::new(),
             |s: String, current: String| s + "\n\n" + &*current,
@@ -37,12 +54,7 @@ pub fn plot_wavefunction_parts(wave_function: &WaveFunction, output_dir: &Path, 
 
     let airy_values_str = airy_values
         .par_iter()
-        .map(|values| {
-            values
-                .par_iter()
-                .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
-                .reduce(|| String::new(), |s: String, current: String| s + &*current)
-        })
+        .map(|values| to_gnuplot_string_complex(values.to_vec()))
         .reduce(
             || String::new(),
             |s: String, current: String| s + "\n\n" + &*current,
@@ -155,10 +167,7 @@ pub fn plot_complex_function(
     std::env::set_current_dir(&output_dir).unwrap();
     let values = evaluate_function_between(func, view.0, view.1, NUMBER_OF_POINTS);
 
-    let values_str = values
-        .par_iter()
-        .map(|p| -> String { format!("{} {} {}\n", p.x, p.y.re, p.y.im) })
-        .reduce(|| String::new(), |s: String, current: String| s + &*current);
+    let values_str = to_gnuplot_string_complex(values);
 
     let mut data_file = File::create(output_file).unwrap();
 
@@ -207,12 +216,15 @@ pub fn plot_probability(wave_function: &WaveFunction, output_dir: &Path, output_
         wave_function.get_view().0,
         wave_function.get_view().1,
         NUMBER_OF_POINTS,
-    );
+    )
+    .par_iter()
+    .map(|p| Point {
+        x: p.x,
+        y: p.y.norm_sqr(),
+    })
+    .collect();
 
-    let values_str = values
-        .par_iter()
-        .map(|p| -> String { format!("{} {}\n", p.x, p.y.norm_sqr()) })
-        .reduce(|| String::new(), |s: String, current: String| s + &*current);
+    let values_str = to_gnuplot_string(values);
 
     let mut data_file = File::create(output_file).unwrap();
 
@@ -224,19 +236,25 @@ pub fn plot_probability(wave_function: &WaveFunction, output_dir: &Path, output_
         .unwrap();
 }
 
-pub fn plot_probability_super_pos(wave_function: &SuperPosition, output_dir: &Path, output_file: &str) {
+pub fn plot_probability_super_pos(
+    wave_function: &SuperPosition,
+    output_dir: &Path,
+    output_file: &str,
+) {
     std::env::set_current_dir(&output_dir).unwrap();
     let values = evaluate_function_between(
         wave_function,
         wave_function.get_view().0,
         wave_function.get_view().1,
         NUMBER_OF_POINTS,
-    );
+    ).par_iter()
+    .map(|p| Point {
+        x: p.x,
+        y: p.y.norm_sqr(),
+    })
+    .collect();
 
-    let values_str = values
-        .par_iter()
-        .map(|p| -> String { format!("{} {}\n", p.x, p.y.norm_sqr()) })
-        .reduce(|| String::new(), |s: String, current: String| s + &*current);
+    let values_str = to_gnuplot_string(values);
 
     let mut data_file = File::create(output_file).unwrap();
 
