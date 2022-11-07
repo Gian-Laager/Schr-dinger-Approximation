@@ -36,7 +36,6 @@ const TRAPEZE_PER_THREAD: usize = 1000;
 const NUMBER_OF_POINTS: usize = 100000;
 
 const AIRY_TRANSITION_FRACTION: f64 = 0.5;
-
 const ENABLE_AIRY_JOINTS: bool = true;
 
 const APPROX_INF: (f64, f64) = (-200.0, 200.0);
@@ -56,11 +55,8 @@ fn main() {
         1.0,
         &[
             (40, 1.0.into()),
-            (41, complex(0.0, 2.0 * f64::consts::PI / 6.0).exp()),
-            (42, complex(0.0, 4.0 * f64::consts::PI / 6.0).exp()),
-            (43, complex(0.0, 6.0 * f64::consts::PI / 6.0).exp()),
-            (44, complex(0.0, 8.0 * f64::consts::PI / 6.0).exp()),
-            (45, complex(0.0, 10.0 * f64::consts::PI / 6.0).exp()),
+            (41, complex(0.0, 2.0 * f64::consts::PI / 3.0).exp()),
+            (42, complex(0.0, 4.0 * f64::consts::PI / 3.0).exp()),
         ],
         APPROX_INF,
         1.5,
