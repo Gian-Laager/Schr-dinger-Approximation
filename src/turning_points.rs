@@ -24,8 +24,8 @@ impl TGroup {
 
 fn validity_func(phase: Phase) -> Arc<dyn Fn(f64) -> f64> {
     Arc::new(move |x: f64| {
-        1.0 / (2.0 * phase.mass).sqrt() * derivative(&|t| (phase.potential)(t), x).abs()
-            - ((phase.potential)(x) - phase.energy).pow(2)
+        1.0 / (2.0 * phase.mass).sqrt() * derivative(&|t| (phase.potential)(t), x).abs() * 3.5
+            - ((phase.potential)(x) - phase.energy).pow(2) 
     })
 }
 
@@ -108,7 +108,7 @@ pub fn calc_ts(phase: &Phase, view: (f64, f64)) -> TGroup {
 fn find_zeros(phase: &Phase, view: (f64, f64)) -> Vec<f64> {
     let phase_clone = phase.clone();
     let validity_func = Arc::new(move |x: f64| {
-        1.0 / (2.0 * phase_clone.mass).sqrt() * derivative(&|t| (phase_clone.potential)(t), x).abs()
+        1.0 / (2.0 * phase_clone.mass).sqrt() * derivative(&|t| (phase_clone.potential)(t), x).abs() * 3.5
             - ((phase_clone.potential)(x) - phase_clone.energy).pow(2)
     });
     let mut zeros = NewtonsMethodFindNewZero::new(validity_func, ACCURACY, 1e4 as usize);

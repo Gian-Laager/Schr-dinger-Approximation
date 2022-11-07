@@ -82,3 +82,11 @@ impl Func<f64, Complex64> for Derivative<'_> {
         derivative(&|x| self.f.eval(x), x)
     }
 }
+
+pub fn get_wavefunc_exp_sign(x: f64) -> f64 {
+    if -0.5 <= x && x <= 0.5 {
+        return 1.0;
+    } else {
+        return -1.0;
+    } 
+}

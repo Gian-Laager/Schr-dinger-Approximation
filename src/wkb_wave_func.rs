@@ -116,38 +116,20 @@ impl WkbWaveFunction {
     pub fn get_op(&self) -> Box<fn(Complex64) -> Complex64> {
         Box::new(self.op)
     }
-}
 
-impl Func<f64, Complex64> for WkbWaveFunction {
-    fn eval(&self, x: f64) -> Complex64 {
-        let val = if self.phase.energy < (self.phase.potential)(x) {
-            let integral = integrate(
-                evaluate_function_between(
-                    self.phase.as_ref(),
-                    x,
-                    self.turning_point_exp,
-                    self.integration_steps,
-                ),
-                TRAPEZE_PER_THREAD,
-            );
-            if x < self.turning_point_exp {
-                (self.c * 0.5 * (-integral.abs()).exp())
-                    * if COMPLEX_EXP_WKB {
-                        complex((self.phase_off).cos(), -(self.phase_off).sin())
-                            / self.phase.sqrt_momentum(x)
-                    } else {
-                        1.0.into()
-                    }
-            } else {
-                (self.c * 0.5 * (-integral.abs()).exp())
-                    * if COMPLEX_EXP_WKB {
-                        complex((self.phase_off).cos(), (self.phase_off).sin())
-                            / self.phase.sqrt_momentum(x)
-                    } else {
-                        1.0.into()
-                    }
-            }
+    pub fn get_exp_sign(&self) -> f64 {
+        let limit_sign = if self.turning_point_exp == self.turning_point_osz {
+            1.0
         } else {
+            -1.0
+        };
+
+        self.psi_osz(self.turning_point_exp + limit_sign * f64::EPSILON.sqrt())
+            .re
+            .signum()
+    }
+
+    fn psi_osz(&self, x: f64) -> Complex64 {
             let integral = integrate(
                 evaluate_function_between(
                     self.phase.as_ref(),
@@ -158,6 +140,48 @@ impl Func<f64, Complex64> for WkbWaveFunction {
                 TRAPEZE_PER_THREAD,
             );
             -self.c * complex((integral - self.phase_off).cos(), 0.0) / self.phase.sqrt_momentum(x)
+    }
+
+    fn psi_exp(&self, x: f64) -> Complex64 {
+            let integral = integrate(
+                evaluate_function_between(
+                    self.phase.as_ref(),
+                    x,
+                    self.turning_point_exp,
+                    self.integration_steps,
+                ),
+                TRAPEZE_PER_THREAD,
+            );
+            let exp_sign = self.get_exp_sign();
+
+            if x < self.turning_point_exp {
+                exp_sign
+                    * (self.c * 0.5 * (-integral.abs()).exp())
+                    * if COMPLEX_EXP_WKB {
+                        complex((self.phase_off).cos(), -(self.phase_off).sin())
+                            / self.phase.sqrt_momentum(x)
+                    } else {
+                        1.0.into()
+                    }
+            } else {
+                exp_sign
+                    * (self.c * 0.5 * (-integral.abs()).exp())
+                    * if COMPLEX_EXP_WKB {
+                        complex((self.phase_off).cos(), (self.phase_off).sin())
+                            / self.phase.sqrt_momentum(x)
+                    } else {
+                        1.0.into()
+                    }
+            }
+    }
+}
+
+impl Func<f64, Complex64> for WkbWaveFunction {
+    fn eval(&self, x: f64) -> Complex64 {
+        let val = if self.phase.energy < (self.phase.potential)(x) {
+            self.psi_exp(x)
+        } else {
+            self.psi_osz(x)
         };
 
         return (self.op)(val);

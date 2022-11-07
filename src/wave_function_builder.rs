@@ -208,7 +208,7 @@ fn sign_match_complex(mut c1: Complex64, mut c2: Complex64) -> bool {
 }
 
 fn calc_phase_offset(phase: Arc<Phase>, (turn_left, turn_right): (f64, f64)) -> Option<f64> {
-    // return Some(f64::consts::PI / 4.0);
+    return Some(f64::consts::PI / 4.0);
 
     let critical_x = (turn_left + turn_right) / 2.0;
     let integral = integrate(
@@ -216,8 +216,24 @@ fn calc_phase_offset(phase: Arc<Phase>, (turn_left, turn_right): (f64, f64)) -> 
         TRAPEZE_PER_THREAD,
     ) % (f64::consts::PI);
 
-    let extremum_err = integral.abs() % f64::consts::PI;
-    let root_err = (integral.abs() - f64::consts::PI / 2.0).abs() % f64::consts::PI;
+    println!(
+        "[calc_phase_offset] integral (mod PI): {}",
+        integral % f64::consts::PI
+    );
+
+    let value = (integral % (f64::consts::PI)) / (f64::consts::PI);
+    println!("[calc_phase_offset] value: {}", value);
+
+    if value < 0.25 || value > 0.75 {
+        return Some(integral - f64::consts::PI / 2.0);
+    } else if value > 0.25 && value < 0.75 {
+        return Some(integral);
+    } else {
+        return None;
+    };
+
+    let extremum_err = (integral % (f64::consts::PI / 2.0)).abs();
+    let root_err = ((integral - f64::consts::PI / 2.0).abs() % f64::consts::PI).abs();
 
     println!("[calc_phase_offset] extremum_err: {}", extremum_err);
     println!("[calc_phase_offset] root_err:     {}", root_err);
@@ -227,7 +243,7 @@ fn calc_phase_offset(phase: Arc<Phase>, (turn_left, turn_right): (f64, f64)) -> 
         return None;
     }
 
-    let result = if root_err > extremum_err {
+    let result = if root_err < extremum_err {
         -integral - f64::consts::PI / 2.0
     } else {
         -integral
@@ -333,6 +349,7 @@ impl WaveFunction {
         scaling: ScalingType,
     ) -> WaveFunction {
         let energy = energy::nth_energy(n_energy, mass, &potential, approx_inf);
+        println!("Energy: {}", energy);
 
         let lower_bound = newtons_method::newtons_method_max_iters(
             &|x| potential(x) - energy,
@@ -354,7 +371,10 @@ impl WaveFunction {
             )
         } else {
             println!("Failed to determine view automatically, using APPROX_INF as view");
-            approx_inf.clone()
+            (
+                approx_inf.0 - f64::EPSILON.sqrt(),
+                approx_inf.1 + f64::EPSILON.sqrt(),
+            )
         };
 
         let phase = Arc::new(Phase::new(energy, mass, potential));
@@ -378,7 +398,7 @@ impl WaveFunction {
                 phase.clone(),
                 1.0.into(),
                 INTEG_STEPS,
-                approx_inf.1,
+                approx_inf.0,
                 approx_inf.1,
                 calc_phase_offset(phase.clone(), approx_inf).unwrap_or(f64::consts::PI / 4.0),
             );
@@ -465,7 +485,13 @@ impl WaveFunction {
             let wkb_airy_pair: Vec<(&(WkbWaveFunction, (f64, f64)), AiryWaveFunction)> = wave_funcs
                 .iter()
                 .zip(airy_wave_funcs.iter())
-                .map(|(w, a)| (w, a.with_phase_off(w.0.phase_off)))
+                .map(|(w, a)| {
+                    (
+                        w,
+                        a.with_phase_off(w.0.phase_off)
+                            .with_c(w.0.get_exp_sign().into()),
+                    )
+                })
                 .collect();
 
             let wkb_ranges = wkb_airy_pair
