@@ -1,5 +1,6 @@
 use crate::wkb_wave_func::Phase;
 use crate::*;
+use ordinal::Ordinal;
 use std::sync::*;
 
 pub enum ScalingType {
@@ -207,134 +208,6 @@ fn sign_match_complex(mut c1: Complex64, mut c2: Complex64) -> bool {
     return sign_match(c1.re, c2.re) && sign_match(c1.im, c2.im);
 }
 
-fn calc_phase_offset(phase: Arc<Phase>, (turn_left, turn_right): (f64, f64)) -> Option<f64> {
-    return Some(f64::consts::PI / 4.0);
-
-    let critical_x = (turn_left + turn_right) / 2.0;
-    let integral = integrate(
-        evaluate_function_between(phase.as_ref(), critical_x, turn_right, INTEG_STEPS),
-        TRAPEZE_PER_THREAD,
-    ) % (f64::consts::PI);
-
-    println!(
-        "[calc_phase_offset] integral (mod PI): {}",
-        integral % f64::consts::PI
-    );
-
-    let value = (integral % (f64::consts::PI)) / (f64::consts::PI);
-    println!("[calc_phase_offset] value: {}", value);
-
-    if value < 0.25 || value > 0.75 {
-        return Some(integral - f64::consts::PI / 2.0);
-    } else if value > 0.25 && value < 0.75 {
-        return Some(integral);
-    } else {
-        return None;
-    };
-
-    let extremum_err = (integral % (f64::consts::PI / 2.0)).abs();
-    let root_err = ((integral - f64::consts::PI / 2.0).abs() % f64::consts::PI).abs();
-
-    println!("[calc_phase_offset] extremum_err: {}", extremum_err);
-    println!("[calc_phase_offset] root_err:     {}", root_err);
-
-    if extremum_err == root_err {
-        println!("Error: failed to calculate phase offset");
-        return None;
-    }
-
-    let result = if root_err < extremum_err {
-        -integral - f64::consts::PI / 2.0
-    } else {
-        -integral
-    };
-
-    // println!("phase_off / PI: {}", (result.abs() % f64::consts::PI) / f64::consts::PI);
-    return Some(result.abs() % f64::consts::PI);
-
-    // let critical_x = (turn_left + turn_right) / 2.0;
-    // if (phase.potential)(critical_x) > phase.energy {
-    //     return None;
-    // }
-    //
-    // let int_left = -integrate(
-    //     evaluate_function_between(phase.as_ref(), critical_x, turn_left, INTEG_STEPS),
-    //     TRAPEZE_PER_THREAD,
-    // );
-    // let int_right = integrate(
-    //     evaluate_function_between(phase.as_ref(), critical_x, turn_left, INTEG_STEPS),
-    //     TRAPEZE_PER_THREAD,
-    // );
-    //
-    // println!("left: {}, right: {}", int_left, int_right);
-    // let phase_off = ((-int_left - int_right) / 2.0) % (2.0 * f64::consts::PI);
-    //
-    // println!("phase_off / PI: {:.12}", phase_off / f64::consts::PI);
-    //
-    // Some(phase_off)
-}
-
-pub fn find_best_op_wave_func_part(
-    phase: Arc<Phase>,
-    previous: &dyn WaveFunctionPartWithOp,
-    current: &dyn WaveFunctionPartWithOp,
-) -> fn(Complex64) -> Complex64 {
-    if !float_compare(current.range().0, previous.range().1, 1e-3) {
-        println!("current: ({}, {})", current.range().0, current.range().1);
-        println!("previous: ({}, {})", previous.range().0, previous.range().1);
-    }
-    assert!(float_compare(current.range().0, previous.range().1, 1e-3));
-    let boundary = current.range().0;
-
-    let deriv_prev = derivative(&|x| previous.eval(x), current.range().0);
-    let val_prev = previous.eval(current.range().0);
-    let deriv = derivative(&|x| current.eval(x), current.range().0);
-    let val = current.eval(boundary);
-
-    return if (phase.potential)(boundary) >= phase.energy {
-        *previous.get_op()
-    } else {
-        let conj_deriv = conjugate(deriv);
-        let conj_val = conjugate(val);
-        let neg_conj_deriv = negative_conj(deriv);
-        let neg_conj_val = negative_conj(val);
-        let neg_deriv = negative(deriv);
-        let neg_val = negative(val);
-
-        let conj_mse = (conj_deriv - deriv_prev).norm_sqr() + (conj_val - val_prev).norm_sqr();
-        let neg_conj_mse =
-            (neg_conj_deriv - deriv_prev).norm_sqr() + (neg_conj_val - val_prev).norm_sqr();
-        let neg_mse = (neg_deriv - deriv_prev).norm_sqr() + (neg_val - val_prev).norm_sqr();
-        let id_mse = (deriv - deriv_prev).norm_sqr() + (val - val_prev).norm_sqr();
-
-        if conj_mse <= neg_conj_mse && conj_mse <= neg_mse && conj_mse <= id_mse {
-            println!(
-                "conjugate mse, conj: {}, neg conj: {}, neg: {}, id: {}",
-                conj_mse, neg_conj_mse, neg_mse, id_mse
-            );
-            conjugate
-        } else if neg_conj_mse <= conj_mse && neg_conj_mse <= neg_mse && neg_conj_mse <= id_mse {
-            println!(
-                "negative conj mse, conj: {}, neg conj: {}, neg: {}, id: {}",
-                conj_mse, neg_conj_mse, neg_mse, id_mse
-            );
-            negative_conj
-        } else if neg_mse <= conj_mse && neg_mse <= neg_conj_mse && neg_mse <= id_mse {
-            println!(
-                "negative mse, conj: {}, neg conj: {}, neg: {}, id: {}",
-                conj_mse, neg_conj_mse, neg_mse, id_mse
-            );
-            negative
-        } else {
-            println!(
-                "identity mse, conj: {}, neg conj: {}, neg: {}, id: {}",
-                conj_mse, neg_conj_mse, neg_mse, id_mse
-            );
-            identity
-        }
-    };
-}
-
 impl WaveFunction {
     pub fn get_energy(&self) -> f64 {
         self.phase.energy
@@ -349,7 +222,7 @@ impl WaveFunction {
         scaling: ScalingType,
     ) -> WaveFunction {
         let energy = energy::nth_energy(n_energy, mass, &potential, approx_inf);
-        println!("Energy: {}", energy);
+        println!("{} Energy: {:.9}", Ordinal(n_energy).to_string(), energy);
 
         let lower_bound = newtons_method::newtons_method_max_iters(
             &|x| potential(x) - energy,
@@ -392,7 +265,7 @@ impl WaveFunction {
                 INTEG_STEPS,
                 approx_inf.0,
                 approx_inf.0,
-                calc_phase_offset(phase.clone(), approx_inf).unwrap_or(f64::consts::PI / 4.0),
+                f64::consts::PI / 4.0,
             );
             let wkb2 = WkbWaveFunction::new(
                 phase.clone(),
@@ -400,7 +273,7 @@ impl WaveFunction {
                 INTEG_STEPS,
                 approx_inf.0,
                 approx_inf.1,
-                calc_phase_offset(phase.clone(), approx_inf).unwrap_or(f64::consts::PI / 4.0),
+                f64::consts::PI / 4.0,
             );
 
             let center = (view.0 + view.1) / 2.0;
@@ -414,29 +287,12 @@ impl WaveFunction {
                 range: (center, approx_inf.1),
             });
 
-            let op = find_best_op_wave_func_part(phase.clone(), wkb1.as_ref(), wkb2.as_ref());
-
             let wkb1_range = wkb1.range();
-            let wkb2 = wkb2.with_op(op);
-            let delta = (view.1 - view.0) * WKB_TRANSITION_FRACTION;
             (
-                if ENABLE_WKB_JOINTS {
-                    vec![
-                        Arc::new(Joint {
-                            left: Arc::from(wkb1.as_func()),
-                            right: Arc::from(wkb2.as_func()),
-                            cut: (view.0 + view.1) / 2.0 - delta / 2.0,
-                            delta: delta,
-                        }),
-                        Arc::from(wkb1.as_wave_function_part()),
-                        Arc::from(wkb2.as_wave_function_part()),
-                    ]
-                } else {
-                    vec![
-                        Arc::from(wkb1.as_wave_function_part()),
-                        Arc::from(wkb2.as_wave_function_part()),
-                    ]
-                },
+                vec![
+                    Arc::from(wkb1.as_wave_function_part()),
+                    Arc::from(wkb2.as_wave_function_part()),
+                ],
                 vec![],
                 vec![wkb1_range, wkb2.range()],
             )
@@ -462,8 +318,7 @@ impl WaveFunction {
                                     INTEG_STEPS,
                                     *boundary,
                                     *previous,
-                                    calc_phase_offset(phase.clone(), (*previous, *boundary))
-                                        .unwrap_or(f64::consts::PI / 4.0),
+                                    f64::consts::PI / 4.0,
                                 )
                             } else {
                                 WkbWaveFunction::new(
@@ -472,8 +327,7 @@ impl WaveFunction {
                                     INTEG_STEPS,
                                     *boundary,
                                     *boundary,
-                                    calc_phase_offset(phase.clone(), (*boundary, *next))
-                                        .unwrap_or(f64::consts::PI / 4.0),
+                                    f64::consts::PI / 4.0,
                                 )
                             },
                             ((boundary + previous) / 2.0, (next + boundary) / 2.0),
@@ -507,56 +361,14 @@ impl WaveFunction {
                 })
                 .collect();
 
-            let mut approx_parts_with_op: Vec<Arc<dyn WaveFunctionPartWithOp>> =
-                vec![Arc::from(approx_parts.first().unwrap().with_op(identity))];
-            approx_parts_with_op.reserve(approx_parts.len() - 1);
-
-            for i in 0..(approx_parts.len() - 1) {
-                let part1 = &approx_parts[i];
-                let part2 = &approx_parts[i + 1];
-                let p2_with_op = part2.with_op(find_best_op_wave_func_part(
-                    phase.clone(),
-                    part1.as_ref(),
-                    part2.as_ref(),
-                ));
-                approx_parts_with_op.push(Arc::from(p2_with_op));
-            }
-            let mut approx_parts_with_joints: Vec<Arc<dyn WaveFunctionPart>> = vec![];
-
-            if ENABLE_WKB_JOINTS {
-                for (prev, curr) in approx_parts_with_op
-                    .iter()
-                    .zip(approx_parts_with_op.iter().skip(1))
-                {
-                    assert!(float_compare(prev.range().1, curr.range().0, 1e-4));
-
-                    let distance = (f64::min(prev.range().1, view.1)
-                        - f64::max(prev.range().0, view.0))
-                        + (f64::min(curr.range().1, view.1) - f64::max(curr.range().0, view.0));
-                    let delta = distance * WKB_TRANSITION_FRACTION;
-                    let joint = Joint {
-                        left: Arc::from(prev.as_func()),
-                        right: Arc::from(curr.as_func()),
-                        cut: f64::min(prev.range().1, view.1) - delta / 2.0,
-                        delta,
-                    };
-
-                    println!("Joint in range: {:#?}, delta: {}", joint.range(), delta);
-
-                    approx_parts_with_joints.push(Arc::new(joint));
-                }
-            }
-
-            approx_parts_with_joints = vec![
-                approx_parts_with_joints,
-                approx_parts_with_op
+            (
+                approx_parts
                     .iter()
                     .map(|p| Arc::from(p.as_wave_function_part()))
                     .collect(),
-            ]
-            .concat();
-
-            (approx_parts_with_joints, airy_ranges, wkb_ranges)
+                airy_ranges,
+                wkb_ranges,
+            )
         };
 
         match scaling {
@@ -694,7 +506,7 @@ impl SuperPosition {
                     view_factor,
                     ScalingType::Mul(*scale),
                 );
-                println!("Calculated Energy {}\n", *e);
+                println!("Calculated {} Energy\n", Ordinal(*e).to_string());
                 return wave;
             })
             .collect();

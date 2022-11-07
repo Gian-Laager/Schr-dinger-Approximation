@@ -89,7 +89,6 @@ impl WkbWaveFunction {
         turning_point_osz: f64,
         phase_off: f64,
     ) -> WkbWaveFunction {
-        println!("WKB phase_off: {}", phase_off);
         return WkbWaveFunction {
             c,
             turning_point_exp,
@@ -130,49 +129,35 @@ impl WkbWaveFunction {
     }
 
     fn psi_osz(&self, x: f64) -> Complex64 {
-            let integral = integrate(
-                evaluate_function_between(
-                    self.phase.as_ref(),
-                    x,
-                    self.turning_point_osz,
-                    self.integration_steps,
-                ),
-                TRAPEZE_PER_THREAD,
-            );
-            -self.c * complex((integral - self.phase_off).cos(), 0.0) / self.phase.sqrt_momentum(x)
+        let integral = integrate(
+            evaluate_function_between(
+                self.phase.as_ref(),
+                x,
+                self.turning_point_osz,
+                self.integration_steps,
+            ),
+            TRAPEZE_PER_THREAD,
+        );
+        -self.c * complex((integral - self.phase_off).cos(), 0.0) / self.phase.sqrt_momentum(x)
     }
 
     fn psi_exp(&self, x: f64) -> Complex64 {
-            let integral = integrate(
-                evaluate_function_between(
-                    self.phase.as_ref(),
-                    x,
-                    self.turning_point_exp,
-                    self.integration_steps,
-                ),
-                TRAPEZE_PER_THREAD,
-            );
-            let exp_sign = self.get_exp_sign();
+        let integral = integrate(
+            evaluate_function_between(
+                self.phase.as_ref(),
+                x,
+                self.turning_point_exp,
+                self.integration_steps,
+            ),
+            TRAPEZE_PER_THREAD,
+        );
+        let exp_sign = self.get_exp_sign();
 
-            if x < self.turning_point_exp {
-                exp_sign
-                    * (self.c * 0.5 * (-integral.abs()).exp())
-                    * if COMPLEX_EXP_WKB {
-                        complex((self.phase_off).cos(), -(self.phase_off).sin())
-                            / self.phase.sqrt_momentum(x)
-                    } else {
-                        1.0.into()
-                    }
-            } else {
-                exp_sign
-                    * (self.c * 0.5 * (-integral.abs()).exp())
-                    * if COMPLEX_EXP_WKB {
-                        complex((self.phase_off).cos(), (self.phase_off).sin())
-                            / self.phase.sqrt_momentum(x)
-                    } else {
-                        1.0.into()
-                    }
-            }
+        if x < self.turning_point_exp {
+            exp_sign * (self.c * 0.5 * (-integral.abs()).exp())
+        } else {
+            exp_sign * (self.c * 0.5 * (-integral.abs()).exp())
+        }
     }
 }
 

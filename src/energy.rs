@@ -3,7 +3,6 @@ use crate::*;
 struct Integrand<'a, F: Fn(f64) -> f64 + Sync> {
     mass: f64,
     pot: &'a F,
-    view: (f64, f64),
     energy: f64,
 }
 
@@ -34,7 +33,6 @@ impl<F: Fn(f64) -> f64 + Sync> Func<f64, f64> for SommerfeldCond<'_, F> {
         let integrand = Integrand {
             mass: self.mass,
             pot: self.pot,
-            view: self.view,
             energy,
         };
         let integral = integrate(
@@ -75,15 +73,4 @@ pub fn nth_energy<F: Fn(f64) -> f64 + Sync>(n: usize, mass: f64, pot: &F, view: 
         energy += ENERGY_STEP - (ENERGY_STEP / (CHECKS_PER_ENERGY_STEP as f64 + 1.0));
         i += int_solutions.len();
     }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    // #[test]
-    // fn square() {
-    //     let pot = |x| x * x;
-    //     assert!((nth_energy(0, 1.0, &pot, (-100.0, 100.0)) - 0.707107).abs() < 1e-7);
-    // }
 }

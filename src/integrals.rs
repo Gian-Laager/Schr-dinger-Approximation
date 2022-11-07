@@ -1,6 +1,7 @@
 use crate::*;
 use rayon::prelude::*;
 
+#[allow(non_camel_case_types)]
 #[derive(Clone)]
 pub struct Point<T_X, T_Y> {
     pub x: T_X,
@@ -192,7 +193,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn integral_of_sinusoidal_exp() {
-        let SINUSOIDAL_EXP_COMPLEX: Function<f64, Complex64> =
+        let sinusoidal_exp_complex: Function<f64, Complex64> =
             Function::new(sinusoidal_exp_complex);
         for i in 0..10 {
             for j in 0..10 {
@@ -202,7 +203,7 @@ mod test {
                 if i == j {
                     assert_eq!(
                         integrate(
-                            evaluate_function_between(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS),
+                            evaluate_function_between(&sinusoidal_exp_complex, a, b, INTEG_STEPS),
                             TRAPEZE_PER_THREAD,
                         ),
                         complex(0.0, 0.0)
@@ -212,7 +213,7 @@ mod test {
                 let epsilon = 0.0001;
                 assert!(complex_compare(
                     integrate(
-                        evaluate_function_between(&SINUSOIDAL_EXP_COMPLEX, a, b, INTEG_STEPS),
+                        evaluate_function_between(&sinusoidal_exp_complex, a, b, INTEG_STEPS),
                         TRAPEZE_PER_THREAD,
                     ),
                     sinusoidal_exp_complex_integral(a, b),

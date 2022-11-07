@@ -44,7 +44,7 @@ pub fn float_compare(expect: f64, actual: f64, epsilon: f64) -> bool {
     let average = (expect + actual) / 2.0;
 
     if average < epsilon {
-        return expect == actual;    
+        return expect == actual;
     }
 
     return (expect - actual) / average < epsilon;
@@ -83,10 +83,10 @@ impl Func<f64, Complex64> for Derivative<'_> {
     }
 }
 
-pub fn get_wavefunc_exp_sign(x: f64) -> f64 {
+fn get_wavefunc_exp_sign(x: f64) -> f64 {
     if -0.5 <= x && x <= 0.5 {
         return 1.0;
     } else {
         return -1.0;
-    } 
+    }
 }

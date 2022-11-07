@@ -6,6 +6,7 @@ use crate::*;
 use num::signum;
 use std::sync::Arc;
 
+#[allow(non_snake_case)]
 fn Ai(x: Complex64) -> Complex64 {
     let go_return;
     unsafe {
@@ -14,6 +15,7 @@ fn Ai(x: Complex64) -> Complex64 {
     return complex(go_return.r0, go_return.r1);
 }
 
+#[allow(non_snake_case)]
 fn Bi(x: Complex64) -> Complex64 {
     return -complex(0.0, 1.0) * Ai(x)
         + 2.0 * Ai(x * complex(-0.5, 3.0_f64.sqrt() / 2.0)) * complex(3_f64.sqrt() / 2.0, 0.5);
@@ -111,13 +113,13 @@ impl Func<f64, Complex64> for AiryWaveFunction {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
 
         if self.u_1 < 0.0 {
-            return self.c *
-                 ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
+            return self.c
+                * ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
                     * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
                     as Complex64;
         } else {
-            return self.c *
-                 ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
+            return self.c
+                * ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
                     * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
                     as Complex64;
         }

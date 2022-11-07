@@ -1,12 +1,10 @@
 use crate::integrals::*;
 use crate::utils::cmp_f64;
-use num::traits::FloatConst;
-use num::{signum, Float};
+use num::Float;
 use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::ops::*;
-use std::rc::Rc;
 use std::sync::Arc;
 
 #[derive(Default, Debug)]
@@ -193,14 +191,6 @@ fn sigmoid(x: f64) -> f64 {
     1.0 / (1.0 + (-x).exp())
 }
 
-fn smooth_sgn(x: f64) -> f64 {
-    if x > 0.0 {
-        (x + 3.0).exp() - 3.0.exp()
-    } else {
-        0.0
-    }
-}
-
 fn check_sign(initial: f64, new: f64) -> bool {
     if initial == new {
         return false;
@@ -335,7 +325,7 @@ where
 
 pub fn newtons_method_find_new_zero<F>(
     f: &F,
-    mut guess: f64,
+    guess: f64,
     precision: f64,
     max_iters: usize,
     known_zeros: &Vec<f64>,
@@ -347,19 +337,10 @@ where
     newtons_method_max_iters(&f_modified, guess, precision, max_iters)
 }
 
-pub fn inverse<F, A, R>(f: &F) -> Box<dyn Fn(R) -> Vec<A>>
-where
-    F: Fn(A) -> R,
-{
-    todo!();
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::integrals::*;
     use crate::utils::cmp_f64;
-    use num::zero;
 
     fn float_compare(expect: f64, actual: f64, epsilon: f64) -> bool {
         let average = (expect.abs() + actual.abs()) / 2.0;
@@ -442,7 +423,7 @@ mod test {
                     let c = index_to_range(k as f64, 0.0, 10.0, -1.0, 20.0);
                     let test_func = |x: f64| (x - a) * (x - b) * (x - c);
 
-                    for guess in [a, b, c] {
+                    for _guess in [a, b, c] {
                         let mut finder =
                             NewtonsMethodFindNewZero::new(Arc::new(test_func), 1e-15, 10000000);
 
@@ -469,14 +450,13 @@ mod test {
 
     #[test]
     fn newtons_method_find_next_test() {
-        use std::f64::consts;
         let interval = (-10.0, 10.0);
 
         let test_func = |x: f64| 5.0 * (3.0 * x + 1.0).abs() - (1.5 * x.powi(2) + x - 50.0).powi(2);
 
         let mut finder = NewtonsMethodFindNewZero::new(Arc::new(test_func), 1e-11, 100000000);
 
-        for i in 0..4 {
+        for _i in 0..4 {
             let guess = make_guess(&|x| finder.modified_func(x), interval, 1000);
             finder.next_zero(guess.unwrap());
         }

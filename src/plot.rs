@@ -247,7 +247,8 @@ pub fn plot_probability_super_pos(
         wave_function.get_view().0,
         wave_function.get_view().1,
         NUMBER_OF_POINTS,
-    ).par_iter()
+    )
+    .par_iter()
     .map(|p| Point {
         x: p.x,
         y: p.y.norm_sqr(),
