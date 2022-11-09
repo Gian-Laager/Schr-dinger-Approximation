@@ -239,8 +239,8 @@ impl WaveFunction {
 
         let view = if lower_bound.is_some() && upper_bound.is_some() {
             (
-                lower_bound.unwrap() * view_factor,
-                upper_bound.unwrap() * view_factor,
+                lower_bound.unwrap() * (upper_bound.unwrap() - lower_bound.unwrap()) * view_factor,
+                upper_bound.unwrap() * (upper_bound.unwrap() - lower_bound.unwrap()) * view_factor,
             )
         } else {
             println!("Failed to determine view automatically, using APPROX_INF as view");
