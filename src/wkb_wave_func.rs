@@ -153,11 +153,7 @@ impl WkbWaveFunction {
         );
         let exp_sign = self.get_exp_sign();
 
-        if x < self.turning_point_exp {
-            exp_sign * (self.c * 0.5 * (-integral.abs()).exp())
-        } else {
-            exp_sign * (self.c * 0.5 * (-integral.abs()).exp())
-        }
+        exp_sign * (self.c * 0.5 * (-integral.abs()).exp())
     }
 }
 
