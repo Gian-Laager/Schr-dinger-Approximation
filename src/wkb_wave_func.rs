@@ -138,7 +138,7 @@ impl WkbWaveFunction {
             ),
             TRAPEZE_PER_THREAD,
         );
-        -self.c * complex((integral - self.phase_off).cos(), 0.0) / self.phase.sqrt_momentum(x)
+        self.c * complex((integral + self.phase_off).cos(), 0.0) / self.phase.sqrt_momentum(x)
     }
 
     fn psi_exp(&self, x: f64) -> Complex64 {
