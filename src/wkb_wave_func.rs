@@ -57,7 +57,7 @@ impl Func<f64, f64> for Phase {
 pub struct WkbWaveFunction {
     pub c: Complex64,
     pub turning_point_exp: f64,
-    pub turning_point_osz: f64,
+    pub turning_point_osc: f64,
     pub phase: Arc<Phase>,
     integration_steps: usize,
     op: fn(Complex64) -> Complex64,
@@ -73,7 +73,7 @@ impl WkbWaveFunction {
         WkbWaveFunction {
             c,
             turning_point_exp: self.turning_point_exp,
-            turning_point_osz: self.turning_point_osz,
+            turning_point_osc: self.turning_point_osc,
             phase: self.phase.clone(),
             integration_steps: self.integration_steps,
             op: self.op,
@@ -86,13 +86,13 @@ impl WkbWaveFunction {
         c: Complex64,
         integration_steps: usize,
         turning_point_exp: f64,
-        turning_point_osz: f64,
+        turning_point_osc: f64,
         phase_off: f64,
     ) -> WkbWaveFunction {
         return WkbWaveFunction {
             c,
             turning_point_exp,
-            turning_point_osz,
+            turning_point_osc,
             phase: phase.clone(),
             integration_steps,
             op: identity,
@@ -104,7 +104,7 @@ impl WkbWaveFunction {
         return WkbWaveFunction {
             c: self.c,
             turning_point_exp: self.turning_point_exp,
-            turning_point_osz: self.turning_point_osz,
+            turning_point_osc: self.turning_point_osc,
             phase: self.phase.clone(),
             integration_steps: self.integration_steps,
             op,
@@ -117,23 +117,23 @@ impl WkbWaveFunction {
     }
 
     pub fn get_exp_sign(&self) -> f64 {
-        let limit_sign = if self.turning_point_exp == self.turning_point_osz {
+        let limit_sign = if self.turning_point_exp == self.turning_point_osc {
             1.0
         } else {
             -1.0
         };
 
-        self.psi_osz(self.turning_point_exp + limit_sign * f64::EPSILON.sqrt())
+        self.psi_osc(self.turning_point_exp + limit_sign * f64::EPSILON.sqrt())
             .re
             .signum()
     }
 
-    fn psi_osz(&self, x: f64) -> Complex64 {
+    fn psi_osc(&self, x: f64) -> Complex64 {
         let integral = integrate(
             evaluate_function_between(
                 self.phase.as_ref(),
                 x,
-                self.turning_point_osz,
+                self.turning_point_osc,
                 self.integration_steps,
             ),
             TRAPEZE_PER_THREAD,
@@ -162,7 +162,7 @@ impl Func<f64, Complex64> for WkbWaveFunction {
         let val = if self.phase.energy < (self.phase.potential)(x) {
             self.psi_exp(x)
         } else {
-            self.psi_osz(x)
+            self.psi_osc(x)
         };
 
         return (self.op)(val);
