@@ -1,4 +1,3 @@
-use crate::newtons_method::newtons_method;
 use crate::newtons_method::*;
 use crate::turning_points::*;
 use crate::wkb_wave_func::Phase;
@@ -48,20 +47,14 @@ impl AiryWaveFunction {
         let funcs: Vec<AiryWaveFunction> = turning_point_boundaries
             .ts
             .iter()
-            .map(|((t1, t2), _)| {
-                let x_1 = newtons_method(
-                    &|x| (phase.potential)(x) - phase.energy,
-                    (*t1 + *t2) / 2.0,
-                    1e-7,
-                );
-                let u_1 = 2.0 * phase.mass * -derivative(phase.potential.as_ref(), x_1);
-                // let u_1 = |x| -2.0 * phase.mass * ((phase.potential)(&x) - phase.energy) / (H_BAR * H_BAR * (x - x_1));
+            .map(|((tb1, tb2), t)| {
+                let u_1 = 2.0 * phase.mass * -derivative(phase.potential.as_ref(), *t);
 
                 AiryWaveFunction {
                     u_1,
-                    turning_point: x_1,
+                    turning_point: *t,
                     phase: phase.clone(),
-                    ts: (*t1, *t2),
+                    ts: (*tb1, *tb2),
                     op: identity,
                     c: 1.0.into(),
                     phase_off: 0.0,
@@ -112,17 +105,11 @@ impl Func<f64, Complex64> for AiryWaveFunction {
     fn eval(&self, x: f64) -> Complex64 {
         let u_1_cube_root = Self::get_u_1_cube_root(self.u_1);
 
-        if self.u_1 < 0.0 {
-            return self.c
-                * ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
-                    * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
-                    as Complex64;
-        } else {
-            return self.c
-                * ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
-                    * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
-                    as Complex64;
-        }
+        let value = self.c
+            * ((std::f64::consts::PI.sqrt() / (self.u_1).abs().pow(1.0 / 6.0))
+                * Ai(complex(u_1_cube_root * (self.turning_point - x), 0.0)))
+                as Complex64;
+        return (self.op)(value);
     }
 }
 
