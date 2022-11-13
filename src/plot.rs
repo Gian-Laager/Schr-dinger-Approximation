@@ -187,6 +187,17 @@ pub fn plot_complex_function(
     plot_im_file
         .write_all(format!("plot \"{}\" u 1:3 t \"Im({})\" w l", output_file, title).as_bytes())
         .unwrap();
+
+    let mut plot_color_file = File::create("plot_color.gnuplot").unwrap();
+    plot_color_file
+        .write_all(
+            format!(
+                "set cbrange [-pi:pi]\nset cblabel \"arg({})\"\nset ylabel \"|{}|\"\nset palette model HSV defined (0 0 1 1, 1 1 1 1)\nplot \"{}\" u 1:(sqrt($2**2 + $3**2)):(atan2($2,$3)) w boxes t \"{}\" lc palette z",
+                                                        title,              title,                                                          output_file,                                                title
+            )
+            .as_bytes(),
+        )
+        .unwrap();
 }
 
 pub fn plot_wavefunction(wave_function: &WaveFunction, output_dir: &Path, output_file: &str) {
