@@ -123,7 +123,7 @@ impl WkbWaveFunction {
             -1.0
         };
 
-        self.psi_osc(self.turning_point_exp + limit_sign * f64::EPSILON.sqrt())
+        (self.psi_osc(self.turning_point_exp + limit_sign * f64::EPSILON.sqrt()) / self.c)
             .re
             .signum()
     }
