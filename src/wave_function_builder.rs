@@ -496,7 +496,7 @@ impl SuperPosition {
         scaling: ScalingType,
     ) -> SuperPosition {
         let wave_funcs = n_energies_scaling
-            .iter()
+            .par_iter()
             .map(|(e, scale)| {
                 let wave = WaveFunction::new(
                     potential,

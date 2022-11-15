@@ -104,10 +104,6 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
 pub fn calc_ts(phase: &Phase, view: (f64, f64)) -> TGroup {
     let zeros = find_zeros(phase, view);
     let groups = group_ts(&zeros, phase);
-    println!(
-        "Turning Points: {:.7?}",
-        groups.ts.iter().map(|(_, t)| *t).collect::<Vec<f64>>()
-    );
     return groups;
 }
 
