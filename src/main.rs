@@ -41,38 +41,38 @@ const ENABLE_AIRY_JOINTS: bool = true;
 const VALIDITY_LL_FACTOR: f64 = 3.5;
 
 const APPROX_INF: (f64, f64) = (-200.0, 200.0);
-const VIEW_FACTOR: f64 = 0.25;
+const VIEW_FACTOR: f64 = 0.2;
 
 fn main() {
     // let wave_function = wave_function_builder::WaveFunction::new(
-    //     &potentials::square,
+    //     &potentials::mexican_hat,
     //     1.0, // mass
-    //     9, // nth energy
+    //     54,  // nth energy
     //     APPROX_INF,
     //     VIEW_FACTOR,
-    //     ScalingType::Renormalize(1.0.into()),
+    //     ScalingType::Renormalize(complex(0.0, f64::consts::PI / 4.0).exp()),
     // );
 
-    
     let wave_function = wave_function_builder::SuperPosition::new(
-        &potentials::mexican_hat,
+        &potentials::square,
         1.0, // mass
         &[
-            (15, complex(1.0, 0.0)), // (nth energy, phase)
-            (16, complex(0.0, 1.0)), // (nth energy, phase)
+            (1, complex(1.0, 0.0)), // (nth energy, phase)
+            (2, complex(0.0, 1.0)), // (nth energy, phase)
+            // (10, complex(0.0, 1.0)), // (nth energy, phase)
         ],
         APPROX_INF,
         VIEW_FACTOR,
         ScalingType::Renormalize(complex(1.0, 0.0)),
     );
-    
+
     let output_dir = Path::new("output");
-    
+
     // For WaveFunction
     // plot::plot_wavefunction(&wave_function, output_dir, "data.txt");
     // plot::plot_wavefunction_parts(&wave_function, output_dir, "data.txt");
     // plot::plot_probability(&wave_function, output_dir, "data.txt");
-    
+
     // For SuperPosition
     plot::plot_superposition(&wave_function, output_dir, "data.txt");
     // plot::plot_probability_super_pos(&wave_function, output_dir, "data.txt");

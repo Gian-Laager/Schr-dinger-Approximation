@@ -24,7 +24,9 @@ impl TGroup {
 
 fn validity_func(phase: Phase) -> Arc<dyn Fn(f64) -> f64> {
     Arc::new(move |x: f64| {
-        1.0 / (2.0 * phase.mass).sqrt() * derivative(&|t| (phase.potential)(t), x).abs() * VALIDITY_LL_FACTOR
+        1.0 / (2.0 * phase.mass).sqrt()
+            * derivative(&|t| (phase.potential)(t), x).abs()
+            * VALIDITY_LL_FACTOR
             - ((phase.potential)(x) - phase.energy).pow(2)
     })
 }
