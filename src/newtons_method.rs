@@ -142,7 +142,13 @@ where
     F: Fn(f64) -> f64,
 {
     loop {
-        let step = f(guess) / derivative(f, guess);
+        let deriv = derivative(f, guess);
+
+        if deriv == 0.0 {
+            panic!("Devision by zero");
+        }
+
+        let step = f(guess) / deriv;
         if step.abs() < precision {
             return guess;
         } else {
