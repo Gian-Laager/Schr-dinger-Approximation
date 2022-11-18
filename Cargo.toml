@@ -1,5 +1,5 @@
 [package]
-name = "shroedinger_approx"
+name = "schroedinger_approx"
 version = "0.1.0"
 edition = "2021"
 
