@@ -209,7 +209,7 @@ pub fn plot_wavefunction(wave_function: &WaveFunction, output_dir: &Path, output
         "Psi",
         output_dir,
         output_file,
-        true
+        true,
     );
 }
 
@@ -220,7 +220,7 @@ pub fn plot_superposition(wave_function: &SuperPosition, output_dir: &Path, outp
         "Psi",
         output_dir,
         output_file,
-        true
+        true,
     );
 }
 
