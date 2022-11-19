@@ -107,15 +107,6 @@ where
     };
 }
 
-// pub fn derivative<F, R>(f: &F, x: f64) -> R
-// where
-//     F: Fn(f64) -> R + ?Sized,
-//     R: Sub<R, Output = R> + Div<f64, Output = R>,
-// {
-//     let epsilon = f64::epsilon().sqrt();
-//     (f(x + epsilon / 2.0) - f(x - epsilon / 2.0)) / epsilon
-// }
-
 pub fn derivative<F, R>(func: &F, x: f64) -> R
 where
     F: Fn(f64) -> R + ?Sized,
@@ -183,7 +174,11 @@ where
     F: Fn(f64) -> f64,
 {
     for _ in 0..max_iters {
-        let step = f(guess) / derivative(f, guess);
+        let derivative = derivative(f, guess);
+        if derivative == 0.0 {
+            return None;
+        }
+        let step = f(guess) / derivative;
         if step.abs() < precision {
             return Some(guess);
         } else {
