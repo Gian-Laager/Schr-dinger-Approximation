@@ -75,5 +75,5 @@ fn main() {
 
     // For SuperPosition
     plot::plot_superposition(&wave_function, output_dir, "data.txt");
-    // plot::plot_probability_super_pos(&wave_function, output_dir, "data.txt");
+    // plot::plot_probability_superposition(&wave_function, output_dir, "data.txt");
 }

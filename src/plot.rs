@@ -251,7 +251,7 @@ pub fn plot_probability(wave_function: &WaveFunction, output_dir: &Path, output_
         .unwrap();
 }
 
-pub fn plot_probability_super_pos(
+pub fn plot_probability_superposition(
     wave_function: &SuperPosition,
     output_dir: &Path,
     output_file: &str,
