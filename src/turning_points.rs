@@ -4,7 +4,7 @@ use crate::wkb_wave_func::*;
 use crate::*;
 use num::signum;
 
-const MAX_TURNING_POINTS: usize = 256;
+const MAX_TURNING_POINTS: usize = 2048;
 const ACCURACY: f64 = 1e-9;
 
 pub struct TGroup {
@@ -117,12 +117,15 @@ fn find_zeros(phase: &Phase, view: (f64, f64)) -> Vec<f64> {
     });
     let mut zeros = NewtonsMethodFindNewZero::new(validity_func, ACCURACY, 1e4 as usize);
 
-    (0..MAX_TURNING_POINTS).into_iter().for_each(|_| {
+    for _ in 0..MAX_TURNING_POINTS {
         let modified_func = |x| zeros.modified_func(x);
 
         let guess = make_guess(&modified_func, view, 1000);
-        guess.map(|g| zeros.next_zero(g));
-    });
+        let result = guess.map(|g| zeros.next_zero(g)).flatten();
+        if result.is_none() {
+            break;
+        }
+    }
 
     let view = if view.0 < view.1 {
         view
