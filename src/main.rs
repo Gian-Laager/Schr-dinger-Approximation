@@ -14,6 +14,7 @@ mod turning_points;
 mod utils;
 mod wave_function_builder;
 mod wkb_wave_func;
+mod benchmarks;
 
 use crate::airy::airy_ai;
 use crate::airy_wave_func::AiryWaveFunction;
@@ -89,91 +90,4 @@ fn main() {
     // For SuperPosition
     plot::plot_superposition(&wave_function, output_dir, "data.txt");
     // plot::plot_probability_superposition(&wave_function, output_dir, "data.txt");
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    extern crate test;
-    use test::Bencher;
-
-    macro_rules! evaluate_bench_helper {
-        ($i:ident, $n:expr) => {
-            #[bench]
-            pub fn $i(b: &mut Bencher) {
-                let wave_function = wave_function_builder::WaveFunction::new(
-                    &potentials::square,
-                    1.0, // mass
-                    $n,  // nth energy
-                    APPROX_INF,
-                    VIEW_FACTOR,
-                    ScalingType::Renormalize(complex(0.0, f64::consts::PI / 4.0).exp()),
-                );
-
-                b.iter(|| {
-                    let end = test::black_box(10.0);
-                    evaluate_function_between(&wave_function, -10.0, end, 10);
-                })
-            }
-        };
-    }
-
-    macro_rules! evaluate_bench {
-        ($(($i:ident, $n:expr), )*) => {
-            $(evaluate_bench_helper!($i, $n);)*
-        }
-
-    }
-
-    macro_rules! energy_bench_helper {
-        ($i:ident, $n:expr) => {
-            #[bench]
-            pub fn $i(b: &mut Bencher) {
-                b.iter(|| {
-                    let n = test::black_box($n);
-                    let wave_function = wave_function_builder::WaveFunction::new(
-                        &potentials::square,
-                        1.0, // mass
-                        n,   // nth energy
-                        APPROX_INF,
-                        VIEW_FACTOR,
-                        ScalingType::Renormalize(complex(0.0, f64::consts::PI / 4.0).exp()),
-                    );
-                    let _ = test::black_box(&wave_function);
-                })
-            }
-        };
-    }
-
-    macro_rules! energy_bench {
-        ($(($i:ident, $n:expr), )*) => {
-            $(energy_bench_helper!($i, $n);)*
-        }
-
-    }
-
-    evaluate_bench!(
-        (evaluate_bench1, 1),
-        (evaluate_bench2, 2),
-        (evaluate_bench3, 3),
-        (evaluate_bench4, 4),
-        (evaluate_bench5, 5),
-        (evaluate_bench6, 6),
-        (evaluate_bench7, 7),
-        (evaluate_bench8, 8),
-        (evaluate_bench9, 9),
-    );
-
-    energy_bench!(
-        (energy_bench1, 1),
-        (energy_bench2, 2),
-        (energy_bench3, 3),
-        (energy_bench4, 4),
-        (energy_bench5, 5),
-        (energy_bench6, 6),
-        (energy_bench7, 7),
-        (energy_bench8, 8),
-        (energy_bench9, 9),
-    );
 }
