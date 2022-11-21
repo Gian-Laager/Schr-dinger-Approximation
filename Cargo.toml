@@ -9,6 +9,8 @@ edition = "2021"
 num = "0.4.0"
 rayon = "1.5.3"
 ordinal = "0.3.1"
+duplicate = "0.4.1"
+paste = "1.0.9"
 
 [build-dependencies]
 bindgen = "0.60.1"

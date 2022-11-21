@@ -137,3 +137,57 @@ fn find_zeros(phase: &Phase, view: (f64, f64)) -> Vec<f64> {
         .collect::<Vec<f64>>();
     return unique_zeros;
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    extern crate test;
+
+    use test::Bencher;
+
+    use duplicate::duplicate_item;
+    use paste::paste;
+    use std::sync::Arc;
+
+    #[duplicate_item(
+        num;
+        [1];
+        [2];
+        [3];
+        [4];
+        [5];
+        [6];
+        [7];
+        [8];
+        [9];
+    )]
+    paste! {
+        #[bench]
+        fn [< turning_point_square_nenergy_ num >](b: &mut Bencher){
+            let potential = &potentials::square;
+            let mass = 1.0;
+
+            let energy = energy::nth_energy(num, mass, potential, APPROX_INF);
+            let lower_bound = newtons_method::newtons_method(
+                &|x| potential(x) - energy,
+                APPROX_INF.0,
+                1e-7,
+            );
+            let upper_bound = newtons_method::newtons_method(
+                &|x| potential(x) - energy,
+                APPROX_INF.1,
+                1e-7,
+            );
+            let phase = Arc::new(Phase::new(energy, mass, potential));
+            let view =
+                (
+                    lower_bound - (upper_bound - lower_bound) * VIEW_FACTOR,
+                    upper_bound + (upper_bound - lower_bound) * VIEW_FACTOR,
+                );
+            b.iter(|| {
+                let _result = AiryWaveFunction::new(phase.clone(), test::black_box((view.0, view.1)));
+            });
+        }
+    }
+}

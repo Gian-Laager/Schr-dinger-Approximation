@@ -1,12 +1,8 @@
 use crate::*;
-use num::complex::Complex64;
-use num::pow::Pow;
-use rayon::iter::*;
 use std::f64;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
-use std::sync::Arc;
+
+use duplicate::duplicate_item;
+use paste::paste;
 
 #[cfg(test)]
 mod test {
@@ -27,83 +23,65 @@ mod test {
     const APPROX_INF: (f64, f64) = (-200.0, 200.0);
     const VIEW_FACTOR: f64 = 0.5;
 
-    macro_rules! evaluate_bench_helper {
-        ($i:ident, $n:expr) => {
-            #[bench]
-            pub fn $i(b: &mut Bencher) {
-                let wave_function = wave_function_builder::WaveFunction::new(
-                    &potentials::square,
-                    1.0, // mass
-                    $n,  // nth energy
-                    APPROX_INF,
-                    VIEW_FACTOR,
-                    ScalingType::Renormalize(complex(0.0, f64::consts::PI / 4.0).exp()),
-                );
+    #[duplicate_item(
+              num; 
+              [1];
+              [2];
+              [3];
+              [4];
+              [5];
+              [6];
+              [7];
+              [8];
+              [9];
+            )]
+    paste! {
+        #[bench]
+        fn [< evaluate_bench_nenergy_ num >](b: &mut Bencher){
+            let wave_function = wave_function_builder::WaveFunction::new(
+                &potentials::square,
+                1.0, // mass
+                num,  // nth energy
+                APPROX_INF,
+                VIEW_FACTOR,
+                ScalingType::Renormalize(complex(0.0, f64::consts::PI / 4.0).exp()),
+            );
 
-                b.iter(|| {
-                    let end = test::black_box(10.0);
-                    evaluate_function_between(&wave_function, -10.0, end, 10);
-                })
-            }
-        };
-    }
-
-    macro_rules! evaluate_bench {
-        ($(($i:ident, $n:expr), )*) => {
-            $(evaluate_bench_helper!($i, $n);)*
+            b.iter(|| {
+                let end = test::black_box(10.0);
+                evaluate_function_between(&wave_function, -10.0, end, 10);
+            })
         }
-
     }
 
-    macro_rules! energy_bench_helper {
-        ($i:ident, $n:expr) => {
-            #[bench]
-            pub fn $i(b: &mut Bencher) {
-                b.iter(|| {
-                    let n = test::black_box($n);
-                    let wave_function = wave_function_builder::WaveFunction::new(
-                        &potentials::square,
-                        1.0, // mass
-                        n,   // nth energy
-                        APPROX_INF,
-                        VIEW_FACTOR,
-                        ScalingType::Renormalize(complex(0.0, f64::consts::PI / 4.0).exp()),
-                    );
-                    let _ = test::black_box(&wave_function);
-                })
-            }
-        };
+    #[duplicate_item(
+              num; 
+              [1];
+              [2];
+              [3];
+              [4];
+              [5];
+              [6];
+              [7];
+              [8];
+              [9];
+            )]
+    paste! {
+    #[bench]
+    fn [< energy_bench_nenergy_ num >](b: &mut Bencher) {
+              b.iter(|| {
+                  let n = test::black_box(num);
+                  let wave_function = wave_function_builder::WaveFunction::new(
+                      &potentials::square,
+                      1.0, // mass
+                      n,   // nth energy
+                      APPROX_INF,
+                      VIEW_FACTOR,
+                      ScalingType::Renormalize(complex(0.0, f64::consts::PI / 4.0).exp()),
+                  );
+                  let _ = test::black_box(&wave_function);
+              })
+          }
     }
-
-    macro_rules! energy_bench {
-        ($(($i:ident, $n:expr), )*) => {
-            $(energy_bench_helper!($i, $n);)*
-        }
-
-    }
-
-    evaluate_bench!(
-        (evaluate_bench1, 1),
-        (evaluate_bench2, 2),
-        (evaluate_bench3, 3),
-        (evaluate_bench4, 4),
-        (evaluate_bench5, 5),
-        (evaluate_bench6, 6),
-        (evaluate_bench7, 7),
-        (evaluate_bench8, 8),
-        (evaluate_bench9, 9),
-    );
-
-    energy_bench!(
-        (energy_bench1, 1),
-        (energy_bench2, 2),
-        (energy_bench3, 3),
-        (energy_bench4, 4),
-        (energy_bench5, 5),
-        (energy_bench6, 6),
-        (energy_bench7, 7),
-        (energy_bench8, 8),
-        (energy_bench9, 9),
-    );
 }
 
