@@ -1,15 +1,14 @@
-use crate::*;
-use std::f64;
-
-use duplicate::duplicate_item;
-use paste::paste;
 
 #[cfg(test)]
 mod test {
-    use super::*;
-
     extern crate test;
     use test::Bencher;
+
+    use crate::*;
+    use std::f64;
+
+    use duplicate::duplicate_item;
+    use paste::paste;
 
     const INTEG_STEPS: usize = 64000;
     const TRAPEZE_PER_THREAD: usize = 1000;
@@ -49,7 +48,7 @@ mod test {
 
             b.iter(|| {
                 let end = test::black_box(10.0);
-                evaluate_function_between(&wave_function, -10.0, end, 10);
+                evaluate_function_between(&wave_function, -10.0, end, 100);
             })
         }
     }
@@ -68,6 +67,7 @@ mod test {
             )]
     paste! {
     #[bench]
+    #[ignore]
     fn [< energy_bench_nenergy_ num >](b: &mut Bencher) {
               b.iter(|| {
                   let n = test::black_box(num);
@@ -77,7 +77,7 @@ mod test {
                       n,   // nth energy
                       APPROX_INF,
                       VIEW_FACTOR,
-                      ScalingType::Renormalize(complex(0.0, f64::consts::PI / 4.0).exp()),
+                      ScalingType::None,
                   );
                   let _ = test::black_box(&wave_function);
               })
