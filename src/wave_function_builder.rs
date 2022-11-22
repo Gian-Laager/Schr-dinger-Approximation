@@ -584,16 +584,10 @@ fn renormalize_factor(wave_func: &dyn Func<f64, Complex64>, approx_inf: (f64, f6
             INTEG_STEPS,
         )
         .par_iter()
-        .chunks(TRAPEZE_PER_THREAD)
-        .map(|ps| {
-            ps.iter()
-                .map(|p| Point {
-                    x: p.x,
-                    y: p.y.norm_sqr(),
-                })
-                .collect::<Vec<_>>()
+        .map(|p| Point {
+            x: p.x,
+            y: p.y.norm_sqr(),
         })
-        .flatten()
         .collect(),
         TRAPEZE_PER_THREAD,
     );
