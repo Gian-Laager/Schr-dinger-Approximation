@@ -617,6 +617,9 @@ pub fn renormalize(
 mod test {
     use super::*;
 
+    extern crate test;
+    use test::Bencher;
+
     #[test]
     fn sign_check_complex_test() {
         let range = (-50.0, 50.0);
@@ -638,5 +641,15 @@ mod test {
                 }
             }
         }
+    }
+
+    #[bench]
+    fn renormalize_square(b: &mut Bencher) {
+        let square = Function::new(|x: f64| complex(x*x, 0.0));
+
+        b.iter(||{
+            let bounds = test::black_box((-10.0, 10.0));
+            let _ = test::black_box(renormalize_factor(&square, bounds));
+        });
     }
 }
