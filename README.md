@@ -1,33 +1,14 @@
-# Schrödinger Approximation
+# Code Maturaarbeit Gian Laager
 
-## Building
+This project aims to approximate the one dimensional time independent Schrödinger equation.
 
-(This program was tested in Linux with Clang 13.0.1 and GNU 12.1.0)
+# Run
 
-This will build everything
-```bash
-cmake . -B cmake-build
-cmake --build cmake-build
-```
+Run `cargo run --release`
 
-This will build just the executable
-```bash
-cmake . -B cmake-build
-cmake --build cmake-build --target SchroedingerApproximation
-```
+# Build libariy
 
-This will build the unit tests and the executable as a library
-```bash
-cmake . -B cmake-build
-cmake --build cmake-build --target SchroedingerApproximation_TEST
-```
+go into the `lib` directory and run `sh build.sh` this will compile main.go to a static library
 
-This will build the executable as a library
-```bash
-cmake . -B cmake-build
-cmake --build cmake-build --target SchroedingerApproximation_LIB
-```
 
-For debug version add the `-DCMAKE_BUILD_TYPE=Debug` flag to the first command
 
-The resulting executable will then be in the __cmake-build__ directory

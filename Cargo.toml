@@ -1,0 +1,19 @@
+[package]
+name = "schroedinger_approx"
+version = "1.0.0"
+edition = "2021"
+license = "LGPL-3.0-or-later"
+description = "Program to calulate approximate solutions of the time independant Schroedinger equation using the WKB approximation"
+authors = ["Gian Laager"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+num = "0.4.0"
+rayon = "1.5.3"
+ordinal = "0.3.1"
+duplicate = "0.4.1"
+paste = "1.0.9"
+
+[build-dependencies]
+bindgen = "0.60.1"
