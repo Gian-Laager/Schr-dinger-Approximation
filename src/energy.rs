@@ -39,7 +39,7 @@ impl<F: Fn(f64) -> f64 + Sync> Func<f64, f64> for SommerfeldCond<'_, F> {
             evaluate_function_between(&integrand, self.view.0, self.view.1, INTEG_STEPS),
             TRAPEZE_PER_THREAD,
         );
-        return ((integral - f64::consts::PI) / f64::consts::PI) % 1.0;
+        return ((2.0 * integral - f64::consts::PI) / f64::consts::TAU) % 1.0;
     }
 }
 

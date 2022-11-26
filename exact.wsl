@@ -1,13 +1,13 @@
-c1 = -5.0
-c2 = 1.0
-numberOfPoints = 1000
-m = 2
+c1 = 1.0 
+c2 = 0.0
+numberOfPoints = 10000
+m = 1
 n = 5
 viewFactor = 1.5
 
 V[x_] := x^2
 
-energys = Solve[Integrate[Sqrt[2*m*(en - V[x])], {x, -Sqrt[en], Sqrt[en]}] == 2*Pi*(n + 1/2), en] // N
+energys = Solve[Integrate[Sqrt[2*m*(en - V[x])], {x, -Sqrt[en], Sqrt[en]}] == Pi*(n + 1/2), en] // N
 energy = en /. energys[[1]]
 
 view = Solve[energy == V[x], x]

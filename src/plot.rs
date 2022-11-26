@@ -163,6 +163,7 @@ pub fn plot_complex_function(
     title: &str,
     output_dir: &Path,
     output_file: &str,
+    color_plot: bool,
 ) {
     std::env::set_current_dir(&output_dir).unwrap();
     let values = evaluate_function_between(func, view.0, view.1, NUMBER_OF_POINTS);
@@ -187,6 +188,18 @@ pub fn plot_complex_function(
     plot_im_file
         .write_all(format!("plot \"{}\" u 1:3 t \"Im({})\" w l", output_file, title).as_bytes())
         .unwrap();
+    if color_plot {
+        let mut plot_color_file = File::create("plot_color.gnuplot").unwrap();
+        plot_color_file
+        .write_all(
+            format!(
+                "set cbrange [-pi:pi]\nset cblabel \"arg({})\"\nset ylabel \"|{}|\"\nset palette model HSV defined (0 0 1 1, 1 1 1 1)\nplot \"{}\" u 1:(sqrt($2**2 + $3**2)):(atan2($2,$3)) w boxes t \"{}\" lc palette z",
+                 title, title, output_file, title
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+    }
 }
 
 pub fn plot_wavefunction(wave_function: &WaveFunction, output_dir: &Path, output_file: &str) {
@@ -196,6 +209,7 @@ pub fn plot_wavefunction(wave_function: &WaveFunction, output_dir: &Path, output
         "Psi",
         output_dir,
         output_file,
+        true,
     );
 }
 
@@ -206,6 +220,7 @@ pub fn plot_superposition(wave_function: &SuperPosition, output_dir: &Path, outp
         "Psi",
         output_dir,
         output_file,
+        true,
     );
 }
 
@@ -236,7 +251,7 @@ pub fn plot_probability(wave_function: &WaveFunction, output_dir: &Path, output_
         .unwrap();
 }
 
-pub fn plot_probability_super_pos(
+pub fn plot_probability_superposition(
     wave_function: &SuperPosition,
     output_dir: &Path,
     output_file: &str,

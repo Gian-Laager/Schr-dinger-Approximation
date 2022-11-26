@@ -1,7 +1,9 @@
 #![allow(dead_code)]
+#![feature(test)]
 
 mod airy;
 mod airy_wave_func;
+mod benchmarks;
 mod check;
 mod energy;
 mod integrals;
@@ -38,31 +40,48 @@ const NUMBER_OF_POINTS: usize = 100000;
 const AIRY_TRANSITION_FRACTION: f64 = 0.5;
 const ENABLE_AIRY_JOINTS: bool = true;
 
+const VALIDITY_LL_FACTOR: f64 = 3.5;
+
 const APPROX_INF: (f64, f64) = (-200.0, 200.0);
+const VIEW_FACTOR: f64 = 0.5;
 
 fn main() {
-    // let wave_function = wave_function_builder::WaveFunction::new(
-    //     &potentials::mexican_hat,
-    //     1.0,
-    //     56,
-    //     APPROX_INF,
-    //     1.5,
-    //     ScalingType::Renormalize(1.0.into()),
-    // );
-
-    let wave_function = wave_function_builder::SuperPosition::new(
-        &potentials::square,
-        1.0,
-        &[
-            (40, 1.0.into()),
-            (41, complex(0.0, 2.0 * f64::consts::PI / 3.0).exp()),
-            (42, complex(0.0, 4.0 * f64::consts::PI / 3.0).exp()),
-        ],
+    let wave_function = wave_function_builder::WaveFunction::new(
+        &potentials::mexican_hat,
+        1.0, // mass
+        5,  // nth energy
         APPROX_INF,
-        1.5,
-        ScalingType::Renormalize(complex(1.0, 0.0)),
+        VIEW_FACTOR,
+        ScalingType::Renormalize(1.0.into()),
     );
-
+    
+    // let wave_function = wave_function_builder::SuperPosition::new(
+    //     &potentials::square,
+    //     1.0, // mass
+    //     &[
+    //         (1, complex(1.0, 0.0)), // (nth energy, phase)
+    //         (2, complex(2.0, 0.0)), // (nth energy, phase)
+    //         (3, complex(3.0, 0.0)), // (nth energy, phase)
+    //         (4, complex(4.0, 0.0)), // (nth energy, phase)
+    //         (5, complex(5.0, 0.0)), // (nth energy, phase)
+    //         (6, complex(6.0, 0.0)), // (nth energy, phase)
+    //         (7, complex(7.0, 0.0)), // (nth energy, phase)
+    //         (8, complex(8.0, 0.0)), // (nth energy, phase)
+    //         (9, complex(9.0, 0.0)), // (nth energy, phase)
+    //     ],
+    //     APPROX_INF,
+    //     VIEW_FACTOR,
+    //     ScalingType::Renormalize(complex(1.0, 0.0)),
+    // );
+    
     let output_dir = Path::new("output");
-    plot::plot_superposition(&wave_function, output_dir, "data.txt");
+    
+    // For WaveFunction
+    // plot::plot_wavefunction(&wave_function, output_dir, "data.txt");
+    plot::plot_wavefunction_parts(&wave_function, output_dir, "data.txt");
+    // plot::plot_probability(&wave_function, output_dir, "data.txt");
+    
+    // For SuperPosition
+    // plot::plot_superposition(&wave_function, output_dir, "data.txt");
+    // plot::plot_probability_superposition(&wave_function, output_dir, "data.txt");
 }

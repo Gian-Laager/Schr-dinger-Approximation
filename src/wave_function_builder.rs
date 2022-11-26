@@ -239,8 +239,8 @@ impl WaveFunction {
 
         let view = if lower_bound.is_some() && upper_bound.is_some() {
             (
-                lower_bound.unwrap() * view_factor,
-                upper_bound.unwrap() * view_factor,
+                lower_bound.unwrap() - (upper_bound.unwrap() - lower_bound.unwrap()) * view_factor,
+                upper_bound.unwrap() + (upper_bound.unwrap() - lower_bound.unwrap()) * view_factor,
             )
         } else {
             println!("Failed to determine view automatically, using APPROX_INF as view");
@@ -496,7 +496,7 @@ impl SuperPosition {
         scaling: ScalingType,
     ) -> SuperPosition {
         let wave_funcs = n_energies_scaling
-            .iter()
+            .par_iter()
             .map(|(e, scale)| {
                 let wave = WaveFunction::new(
                     potential,
@@ -576,7 +576,7 @@ where
 }
 
 fn renormalize_factor(wave_func: &dyn Func<f64, Complex64>, approx_inf: (f64, f64)) -> f64 {
-    1.0 / integrate(
+    let area = integrate(
         evaluate_function_between(
             wave_func,
             approx_inf.0 * (1.0 - f64::EPSILON),
@@ -590,7 +590,16 @@ fn renormalize_factor(wave_func: &dyn Func<f64, Complex64>, approx_inf: (f64, f6
         })
         .collect(),
         TRAPEZE_PER_THREAD,
-    )
+    );
+
+    let area = if area == 0.0 {
+        println!("Can't renormalize, area under Psi is 0.");
+        1.0
+    } else {
+        area
+    };
+
+    1.0 / area
 }
 
 pub fn renormalize(
@@ -607,6 +616,9 @@ pub fn renormalize(
 #[cfg(test)]
 mod test {
     use super::*;
+
+    extern crate test;
+    use test::Bencher;
 
     #[test]
     fn sign_check_complex_test() {
@@ -629,5 +641,15 @@ mod test {
                 }
             }
         }
+    }
+
+    #[bench]
+    fn renormalize_square(b: &mut Bencher) {
+        let square = Function::new(|x: f64| complex(x*x, 0.0));
+
+        b.iter(||{
+            let bounds = test::black_box((-10.0, 10.0));
+            let _ = test::black_box(renormalize_factor(&square, bounds));
+        });
     }
 }

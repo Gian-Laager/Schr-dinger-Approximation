@@ -117,8 +117,7 @@ mod test {
         return complex(b * b * b / 3.0 - a * a * a / 3.0, 0.0);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn integral_of_square() {
+    fn integral_of_square() {
         let square_func: Function<f64, Complex64> = Function::new(square);
         for i in 0..100 {
             for j in 0..10 {
@@ -191,8 +190,7 @@ mod test {
         return complex(-0.5, 0.5) * (complex(a, a).exp() - complex(b, b).exp());
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn integral_of_sinusoidal_exp() {
+    fn integral_of_sinusoidal_exp() {
         let sinusoidal_exp_complex: Function<f64, Complex64> =
             Function::new(sinusoidal_exp_complex);
         for i in 0..10 {

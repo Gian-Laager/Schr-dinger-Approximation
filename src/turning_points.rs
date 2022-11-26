@@ -4,7 +4,7 @@ use crate::wkb_wave_func::*;
 use crate::*;
 use num::signum;
 
-const MAX_TURNING_POINTS: usize = 256;
+const MAX_TURNING_POINTS: usize = 2048;
 const ACCURACY: f64 = 1e-9;
 
 pub struct TGroup {
@@ -24,7 +24,9 @@ impl TGroup {
 
 fn validity_func(phase: Phase) -> Arc<dyn Fn(f64) -> f64> {
     Arc::new(move |x: f64| {
-        1.0 / (2.0 * phase.mass).sqrt() * derivative(&|t| (phase.potential)(t), x).abs() * 3.5
+        1.0 / (2.0 * phase.mass).sqrt()
+            * derivative(&|t| (phase.potential)(t), x).abs()
+            * VALIDITY_LL_FACTOR
             - ((phase.potential)(x) - phase.energy).pow(2)
     })
 }
@@ -102,10 +104,6 @@ fn group_ts(zeros: &Vec<f64>, phase: &Phase) -> TGroup {
 pub fn calc_ts(phase: &Phase, view: (f64, f64)) -> TGroup {
     let zeros = find_zeros(phase, view);
     let groups = group_ts(&zeros, phase);
-    println!(
-        "Turning Points: {:.7?}",
-        groups.ts.iter().map(|(_, t)| *t).collect::<Vec<f64>>()
-    );
     return groups;
 }
 
@@ -114,17 +112,20 @@ fn find_zeros(phase: &Phase, view: (f64, f64)) -> Vec<f64> {
     let validity_func = Arc::new(move |x: f64| {
         1.0 / (2.0 * phase_clone.mass).sqrt()
             * derivative(&|t| (phase_clone.potential)(t), x).abs()
-            * 3.5
+            * VALIDITY_LL_FACTOR
             - ((phase_clone.potential)(x) - phase_clone.energy).pow(2)
     });
     let mut zeros = NewtonsMethodFindNewZero::new(validity_func, ACCURACY, 1e4 as usize);
 
-    (0..MAX_TURNING_POINTS).into_iter().for_each(|_| {
+    for _ in 0..MAX_TURNING_POINTS {
         let modified_func = |x| zeros.modified_func(x);
 
         let guess = make_guess(&modified_func, view, 1000);
-        guess.map(|g| zeros.next_zero(g));
-    });
+        let result = guess.map(|g| zeros.next_zero(g)).flatten();
+        if result.is_none() {
+            break;
+        }
+    }
 
     let view = if view.0 < view.1 {
         view
@@ -138,4 +139,58 @@ fn find_zeros(phase: &Phase, view: (f64, f64)) -> Vec<f64> {
         .map(|x| *x)
         .collect::<Vec<f64>>();
     return unique_zeros;
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    extern crate test;
+
+    use test::Bencher;
+
+    use duplicate::duplicate_item;
+    use paste::paste;
+    use std::sync::Arc;
+
+    #[duplicate_item(
+        num;
+        [1];
+        [2];
+        [3];
+        [4];
+        [5];
+        [6];
+        [7];
+        [8];
+        [9];
+    )]
+    paste! {
+        #[bench]
+        fn [< turning_point_square_nenergy_ num >](b: &mut Bencher){
+            let potential = &potentials::square;
+            let mass = 1.0;
+
+            let energy = energy::nth_energy(num, mass, potential, APPROX_INF);
+            let lower_bound = newtons_method::newtons_method(
+                &|x| potential(x) - energy,
+                APPROX_INF.0,
+                1e-7,
+            );
+            let upper_bound = newtons_method::newtons_method(
+                &|x| potential(x) - energy,
+                APPROX_INF.1,
+                1e-7,
+            );
+            let phase = Arc::new(Phase::new(energy, mass, potential));
+            let view =
+                (
+                    lower_bound - (upper_bound - lower_bound) * VIEW_FACTOR,
+                    upper_bound + (upper_bound - lower_bound) * VIEW_FACTOR,
+                );
+            b.iter(|| {
+                let _result = AiryWaveFunction::new(phase.clone(), test::black_box((view.0, view.1)));
+            });
+        }
+    }
 }

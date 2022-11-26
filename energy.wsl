@@ -2,7 +2,7 @@ m = 1
 V[x_] = x^2
 
 nthEnergy[n_] = Module[{energys, energy},
-    energys =  Solve[Integrate[Sqrt[2*m*(en - V[x])], {x, -Sqrt[en], Sqrt[en]}] == 2*Pi*(n + 1/2), en] // N;
+    energys =  Solve[Integrate[Sqrt[2*m*(en - V[x])], {x, -Sqrt[en], Sqrt[en]}] == Pi*(n + 1/2), en] // N;
     energy = en /. energys[[1]];
     energy
     ]

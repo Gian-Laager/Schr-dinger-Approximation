@@ -73,6 +73,17 @@ impl<A, R> Func<A, R> for Function<A, R> {
         (self.f)(x)
     }
 }
+
+pub struct NormSquare<'a> {
+    pub f: &'a dyn Func<f64, Complex64>,
+}
+
+impl Func<f64, f64> for NormSquare<'_> {
+    fn eval(&self, x: f64) -> f64 {
+        self.f.eval(x).norm_sqr()
+    }
+}
+
 pub struct Derivative<'a> {
     pub f: &'a dyn Func<f64, Complex64>,
 }
@@ -80,13 +91,5 @@ pub struct Derivative<'a> {
 impl Func<f64, Complex64> for Derivative<'_> {
     fn eval(&self, x: f64) -> Complex64 {
         derivative(&|x| self.f.eval(x), x)
-    }
-}
-
-fn get_wavefunc_exp_sign(x: f64) -> f64 {
-    if -0.5 <= x && x <= 0.5 {
-        return 1.0;
-    } else {
-        return -1.0;
     }
 }
