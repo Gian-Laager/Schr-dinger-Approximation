@@ -193,7 +193,7 @@ pub fn plot_complex_function(
         plot_color_file
         .write_all(
             format!(
-                "set cbrange [-pi:pi]\nset cblabel \"arg({})\"\nset ylabel \"|{}|\"\nset palette model HSV defined (0 0 1 1, 1 1 1 1)\nplot \"{}\" u 1:(sqrt($2**2 + $3**2)):(atan2($2,$3)) w boxes t \"{}\" lc palette z",
+                "set cbrange [-pi:pi]\nset cblabel \"arg({})\"\nset ylabel \"|{}|\"\nset palette model HSV defined (0 0 1 1, 1 1 1 1)\nplot \"{}\" u 1:(sqrt($2**2 + $3**2)):(atan2($3,$2)) w boxes t \"{}\" lc palette z",
                  title, title, output_file, title
             )
             .as_bytes(),
