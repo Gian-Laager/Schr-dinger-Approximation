@@ -481,12 +481,12 @@ impl Func<f64, Complex64> for WaveFunction {
     }
 }
 
-pub struct SuperPosition {
+pub struct Superposition {
     wave_funcs: Vec<WaveFunction>,
     scaling: Complex64,
 }
 
-impl SuperPosition {
+impl Superposition {
     pub fn new<F: Fn(f64) -> f64 + Send + Sync>(
         potential: &'static F,
         mass: f64,
@@ -494,7 +494,7 @@ impl SuperPosition {
         approx_inf: (f64, f64),
         view_factor: f64,
         scaling: ScalingType,
-    ) -> SuperPosition {
+    ) -> Superposition {
         let wave_funcs = n_energies_scaling
             .par_iter()
             .map(|(e, scale)| {
@@ -512,22 +512,22 @@ impl SuperPosition {
             .collect();
 
         match scaling {
-            ScalingType::Mul(s) => SuperPosition {
+            ScalingType::Mul(s) => Superposition {
                 wave_funcs,
                 scaling: s,
             },
-            ScalingType::None => SuperPosition {
+            ScalingType::None => Superposition {
                 wave_funcs,
                 scaling: 1.0.into(),
             },
             ScalingType::Renormalize(s) => {
-                let unscaled = SuperPosition {
+                let unscaled = Superposition {
                     wave_funcs: wave_funcs.clone(),
                     scaling: s,
                 };
                 let factor = renormalize_factor(&unscaled, approx_inf);
                 println!("factor: {}", factor);
-                SuperPosition {
+                Superposition {
                     wave_funcs,
                     scaling: s * factor,
                 }
@@ -552,7 +552,7 @@ impl SuperPosition {
     }
 }
 
-impl Func<f64, Complex64> for SuperPosition {
+impl Func<f64, Complex64> for Superposition {
     fn eval(&self, x: f64) -> Complex64 {
         self.scaling * self.wave_funcs.iter().map(|w| w.eval(x)).sum::<Complex64>()
     }

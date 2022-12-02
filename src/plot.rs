@@ -176,24 +176,24 @@ pub fn plot_complex_function(
 
     let mut plot_3d_file = File::create("plot_3d.gnuplot").unwrap();
     plot_3d_file
-        .write_all(format!("splot \"{}\" u 1:2:3 t \"{}\" w l", output_file, title).as_bytes())
+        .write_all(format!("set xlabel \"x\"\nset ylabel \"Re({title})\"\nset zlabel \"Im({title})\"\nsplot \"{}\" u 1:2:3 t \"{}\" w l", output_file, title).as_bytes())
         .unwrap();
 
     let mut plot_file = File::create("plot.gnuplot").unwrap();
     plot_file
-        .write_all(format!("plot \"{}\" u 1:2 t \"Re({})\" w l", output_file, title).as_bytes())
+        .write_all(format!("set xlabel \"x\"\nset ylabel \"Re({title})\"\nplot \"{}\" u 1:2 t \"Re({})\" w l", output_file, title).as_bytes())
         .unwrap();
 
     let mut plot_im_file = File::create("plot_im.gnuplot").unwrap();
     plot_im_file
-        .write_all(format!("plot \"{}\" u 1:3 t \"Im({})\" w l", output_file, title).as_bytes())
+        .write_all(format!("set xlabel \"x\"\nset ylabel \"Im({title})\"\nplot \"{}\" u 1:3 t \"Im({})\" w l", output_file, title).as_bytes())
         .unwrap();
     if color_plot {
         let mut plot_color_file = File::create("plot_color.gnuplot").unwrap();
         plot_color_file
         .write_all(
             format!(
-                "set cbrange [-pi:pi]\nset cblabel \"arg({})\"\nset ylabel \"|{}|\"\nset palette model HSV defined (0 0 1 1, 1 1 1 1)\nplot \"{}\" u 1:(sqrt($2**2 + $3**2)):(atan2($3,$2)) w boxes t \"{}\" lc palette z",
+                "set cbrange [-pi:pi]\nset cblabel \"arg({})\"\nset ylabel \"|{}|\"\nset xlabel \"x\"\nset palette model HSV defined (0 0 1 1, 1 1 1 1)\nplot \"{}\" u 1:(sqrt($2**2 + $3**2)):(atan2($3,$2)) w boxes t \"{}\" lc palette z",
                  title, title, output_file, title
             )
             .as_bytes(),
@@ -213,7 +213,7 @@ pub fn plot_wavefunction(wave_function: &WaveFunction, output_dir: &Path, output
     );
 }
 
-pub fn plot_superposition(wave_function: &SuperPosition, output_dir: &Path, output_file: &str) {
+pub fn plot_superposition(wave_function: &Superposition, output_dir: &Path, output_file: &str) {
     plot_complex_function(
         wave_function,
         wave_function.get_view(),
@@ -247,12 +247,12 @@ pub fn plot_probability(wave_function: &WaveFunction, output_dir: &Path, output_
 
     let mut plot_file = File::create("plot.gnuplot").unwrap();
     plot_file
-        .write_all(format!("plot \"{}\" u 1:2 t \"|Psi|^2\" w l", output_file).as_bytes())
+        .write_all(format!("set xlabel \"x\"; set ylabel \"|Psi|^2\"; plot \"{}\" u 1:2 t \"|Psi|^2\" w l", output_file).as_bytes())
         .unwrap();
 }
 
 pub fn plot_probability_superposition(
-    wave_function: &SuperPosition,
+    wave_function: &Superposition,
     output_dir: &Path,
     output_file: &str,
 ) {
@@ -278,6 +278,6 @@ pub fn plot_probability_superposition(
 
     let mut plot_file = File::create("plot.gnuplot").unwrap();
     plot_file
-        .write_all(format!("plot \"{}\" u 1:2 t \"|Psi|^2\" w l", output_file).as_bytes())
+        .write_all(format!("set xlabel \"x\"; set ylabel \"|Psi|^2\"; plot \"{}\" u 1:2 t \"|Psi|^2\" w l", output_file).as_bytes())
         .unwrap();
 }
