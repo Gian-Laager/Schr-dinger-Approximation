@@ -55,28 +55,28 @@ fn main() {
         ScalingType::Renormalize(1.0.into())
     );
     
-    let wave_function = wave_function_builder::Superposition::new(
-        &potentials::square,
-        1.0, // mass
-        &[
-            (9,  complex(0.0, 0.0 * f64::consts::PI / 3.0).exp()), // (nth energy, phase)
-            (12, complex(0.0, 1.0 * f64::consts::PI / 3.0).exp()), // (nth energy, phase)
-            (15, complex(0.0, 2.0 * f64::consts::PI / 3.0).exp()), // (nth energy, phase)
-            
-        ],
-        APPROX_INF,
-        VIEW_FACTOR,
-        ScalingType::Renormalize(complex(1.0, 0.0)),
-    );
+    // let wave_function = wave_function_builder::Superposition::new(
+    //     &potentials::square,
+    //     1.0, // mass
+    //     &[
+    //         (9,  complex(0.0, 0.0 * f64::consts::PI / 3.0).exp()), // (nth energy, phase)
+    //         (12, complex(0.0, 1.0 * f64::consts::PI / 3.0).exp()), // (nth energy, phase)
+    //         (15, complex(0.0, 2.0 * f64::consts::PI / 3.0).exp()), // (nth energy, phase)
+    //        
+    //     ],
+    //     APPROX_INF,
+    //     VIEW_FACTOR,
+    //     ScalingType::Renormalize(complex(1.0, 0.0)),
+    // );
     
     let output_dir = Path::new("output");
     
     // For WaveFunction
-    // plot::plot_wavefunction(&wave_function, output_dir, "data.txt");
+    plot::plot_wavefunction(&wave_function, output_dir, "data.txt");
     // plot::plot_wavefunction_parts(&wave_function, output_dir, "data.txt");
     // plot::plot_probability(&wave_function, output_dir, "data.txt");
     
     // For Superposition
-    plot::plot_superposition(&wave_function, output_dir, "data.txt");
+    // plot::plot_superposition(&wave_function, output_dir, "data.txt");
     // plot::plot_probability_superposition(&wave_function, output_dir, "data.txt");
 }
